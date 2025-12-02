@@ -1,4 +1,16 @@
-import { ENTITY_CONFIGS, type EntityName } from '../config.js';
+import { getEntityConfigs } from '../config.js';
+
+/**
+ * Get config for an entity
+ */
+function getConfig(entityName: string) {
+  const configs = getEntityConfigs();
+  const config = configs[entityName];
+  if (!config) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+  return config;
+}
 
 /**
  * Normalize a subgraph response to a flat format for comparison
@@ -6,10 +18,10 @@ import { ENTITY_CONFIGS, type EntityName } from '../config.js';
  * - Converts BigInt strings to strings for consistent comparison
  */
 export function normalizeSubgraphResponse(
-  entityName: EntityName,
+  entityName: string,
   records: Record<string, unknown>[]
 ): Map<string, Record<string, unknown>> {
-  const config = ENTITY_CONFIGS[entityName];
+  const config = getConfig(entityName);
   const normalized = new Map<string, Record<string, unknown>>();
 
   for (const record of records) {
@@ -37,10 +49,10 @@ export function normalizeSubgraphResponse(
  * Normalize a HyperIndex response (already flat, just normalize values)
  */
 export function normalizeHyperIndexResponse(
-  entityName: EntityName,
+  entityName: string,
   records: Record<string, unknown>[]
 ): Map<string, Record<string, unknown>> {
-  const config = ENTITY_CONFIGS[entityName];
+  const config = getConfig(entityName);
   const normalized = new Map<string, Record<string, unknown>>();
 
   for (const record of records) {
@@ -103,8 +115,8 @@ function normalizeValue(value: unknown): unknown {
 /**
  * Get all comparable field names for an entity
  */
-export function getComparableFields(entityName: EntityName): string[] {
-  const config = ENTITY_CONFIGS[entityName];
+export function getComparableFields(entityName: string): string[] {
+  const config = getConfig(entityName);
   return [
     ...config.fields,
     ...Object.values(config.nestedFields)

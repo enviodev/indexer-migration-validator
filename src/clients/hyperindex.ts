@@ -1,13 +1,25 @@
 import { GraphQLClient } from 'graphql-request';
-import { HYPERINDEX_URL, ENTITY_CONFIGS, type EntityName } from '../config.js';
+import { HYPERINDEX_URL, getEntityConfigs } from '../config.js';
 
 const client = new GraphQLClient(HYPERINDEX_URL);
 
 /**
+ * Get config for an entity
+ */
+function getConfig(entityName: string) {
+  const configs = getEntityConfigs();
+  const config = configs[entityName];
+  if (!config) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+  return config;
+}
+
+/**
  * Build a HyperIndex query for fetching entity IDs
  */
-function buildIdQuery(entityName: EntityName, limit: number, offset: number): string {
-  const config = ENTITY_CONFIGS[entityName];
+function buildIdQuery(entityName: string, limit: number, offset: number): string {
+  const config = getConfig(entityName);
   return `
     query {
       ${config.hyperindexName}(limit: ${limit}, offset: ${offset}, order_by: {id: asc}) {
@@ -20,12 +32,12 @@ function buildIdQuery(entityName: EntityName, limit: number, offset: number): st
 /**
  * Build a HyperIndex query for fetching full entity data by IDs
  */
-function buildDataQuery(entityName: EntityName, ids: string[]): string {
-  const config = ENTITY_CONFIGS[entityName];
+function buildDataQuery(entityName: string, ids: string[]): string {
+  const config = getConfig(entityName);
   const idsString = ids.map(id => `"${id}"`).join(', ');
 
   // Build field selection - HyperIndex uses _id suffix for foreign keys
-  const fields = [...config.fields];
+  const fields: string[] = [...config.fields];
   for (const [, hyperindexField] of Object.entries(config.nestedFields)) {
     fields.push(hyperindexField);
   }
@@ -42,9 +54,9 @@ function buildDataQuery(entityName: EntityName, ids: string[]): string {
 /**
  * Fetch entity IDs from HyperIndex
  */
-export async function fetchIds(entityName: EntityName, limit: number, offset: number = 0): Promise<string[]> {
+export async function fetchIds(entityName: string, limit: number, offset: number = 0): Promise<string[]> {
   const query = buildIdQuery(entityName, limit, offset);
-  const config = ENTITY_CONFIGS[entityName];
+  const config = getConfig(entityName);
 
   try {
     const result = await client.request<Record<string, Array<{ id: string }>>>(query);
@@ -59,11 +71,11 @@ export async function fetchIds(entityName: EntityName, limit: number, offset: nu
 /**
  * Fetch full entity data by IDs from HyperIndex
  */
-export async function fetchByIds(entityName: EntityName, ids: string[]): Promise<Record<string, unknown>[]> {
+export async function fetchByIds(entityName: string, ids: string[]): Promise<Record<string, unknown>[]> {
   if (ids.length === 0) return [];
 
   const query = buildDataQuery(entityName, ids);
-  const config = ENTITY_CONFIGS[entityName];
+  const config = getConfig(entityName);
 
   try {
     const result = await client.request<Record<string, Record<string, unknown>[]>>(query);
@@ -78,8 +90,8 @@ export async function fetchByIds(entityName: EntityName, ids: string[]): Promise
 /**
  * Get total count for an entity using aggregate query
  */
-export async function fetchCount(entityName: EntityName): Promise<number> {
-  const config = ENTITY_CONFIGS[entityName];
+export async function fetchCount(entityName: string): Promise<number> {
+  const config = getConfig(entityName);
   const query = `
     query {
       ${config.hyperindexName}_aggregate {
@@ -115,7 +127,7 @@ export async function fetchCount(entityName: EntityName): Promise<number> {
 /**
  * Fetch ALL entity IDs using pagination
  */
-export async function fetchAllIds(entityName: EntityName, onProgress?: (count: number) => void): Promise<string[]> {
+export async function fetchAllIds(entityName: string, onProgress?: (count: number) => void): Promise<string[]> {
   const allIds: string[] = [];
   let offset = 0;
   const batchSize = 1000;
@@ -143,7 +155,7 @@ export async function fetchAllIds(entityName: EntityName, onProgress?: (count: n
  * Fetch full entity data for ALL IDs (with batching)
  */
 export async function fetchAllByIds(
-  entityName: EntityName,
+  entityName: string,
   ids: string[],
   onProgress?: (fetched: number, total: number) => void
 ): Promise<Record<string, unknown>[]> {

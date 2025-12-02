@@ -1,0 +1,70 @@
+{
+  "fieldMappings": {
+    "CollectionToken": {
+      "native": "isNative"
+    },
+    "PoolSwap": {
+      "type": "swapType"
+    },
+    "Activity": {
+      "type": "activityType"
+    },
+    "TokenDayData": {
+      "open": "priceOpen",
+      "high": "priceHigh",
+      "low": "priceLow",
+      "close": "priceClose",
+      "openUSDC": "priceOpenUSDC",
+      "highUSDC": "priceHighUSDC",
+      "lowUSDC": "priceLowUSDC",
+      "closeUSDC": "priceCloseUSDC"
+    },
+    "TokenHourData": {
+      "open": "priceOpen",
+      "high": "priceHigh",
+      "low": "priceLow",
+      "close": "priceClose",
+      "openUSDC": "priceOpenUSDC",
+      "highUSDC": "priceHighUSDC",
+      "lowUSDC": "priceLowUSDC",
+      "closeUSDC": "priceCloseUSDC"
+    },
+    "TokenMinuteData": {
+      "open": "priceOpen",
+      "high": "priceHigh",
+      "low": "priceLow",
+      "close": "priceClose",
+      "openUSDC": "priceOpenUSDC",
+      "highUSDC": "priceHighUSDC",
+      "lowUSDC": "priceLowUSDC",
+      "closeUSDC": "priceCloseUSDC"
+    },
+    "Token15MinuteData": {
+      "open": "priceOpen",
+      "high": "priceHigh",
+      "low": "priceLow",
+      "close": "priceClose",
+      "openUSDC": "priceOpenUSDC",
+      "highUSDC": "priceHighUSDC",
+      "lowUSDC": "priceLowUSDC",
+      "closeUSDC": "priceCloseUSDC"
+    },
+    "Token4HourData": {
+      "open": "priceOpen",
+      "high": "priceHigh",
+      "low": "priceLow",
+      "close": "priceClose",
+      "openUSDC": "priceOpenUSDC",
+      "highUSDC": "priceHighUSDC",
+      "lowUSDC": "priceLowUSDC",
+      "closeUSDC": "priceCloseUSDC"
+    }
+  },
+  "knownIdMismatch": [
+    "CollectionTokenHolding",
+    "CollectionTokenHoldingChange",
+    "PoolSwap",
+    "Activity"
+  ],
+  "skipEntities": []
+}

@@ -28,4 +28,7 @@ npm-debug.log*
 # TypeScript cache
 *.tsbuildinfo
 
+# Generated config (from --generate-config)
+generated-entity-configs.ts
+
 PLANNED_FIXES.md
