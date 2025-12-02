@@ -1,0 +1,1218 @@
+type Config @entity {
+  id: Bytes! # Constant
+  locked: Boolean! #Flaunch
+  lockerPaused: Boolean! #Flayer
+  collectionCount: BigInt!
+  volumeETH: BigInt!
+  volumeUSDC: BigDecimal! # USDC values preserve 6 decimal places precision
+  totalUsers: BigInt!
+  totalFeesETH: BigInt! 
+  totalFeesUSDC: BigDecimal! # USDC values preserve 6 decimal places precision
+  feeCalculator: Bytes!
+  protocolFeeRecipient: Bytes!
+  feeDistribution: FeeDistribution!
+  latestReferralEscrow: Bytes!
+  staleTimeWindow: BigInt!
+}
+
+type User @entity(immutable: true) {
+  id: Bytes!
+  aggregates: UserAggregate @derivedFrom(field: "user")
+  holdings: [CollectionTokenHolding!] @derivedFrom(field: "user")
+  ownedNFTs: [Collection!] @derivedFrom(field: "owner")
+  createdNFTs: [Collection!] @derivedFrom(field: "creator")
+  referrerFees: [ReferrerFee!] @derivedFrom(field: "recipient")
+}
+
+type UserAggregate @entity {
+  id: Bytes!
+  totalReferrerFeesETH: BigInt!
+  user: User!
+}
+
+type TokenReferralFee @entity {
+  id: Bytes!
+  totalAmount: BigInt!
+  collectionToken: CollectionToken
+  isFleth: Boolean!
+  user: User!
+}
+
+type CollectionTokenHolding @entity {
+  #ERC20 vault balance
+  id: Bytes! #User-CollectionToken
+  collectionToken: CollectionToken!
+  user: User!
+  balance: BigInt!
+  balanceBefore: BigInt!
+  createdTx: Bytes!
+  createdTimestamp: BigInt!
+  updatedTx: Bytes!
+  updatedTimestamp: BigInt!
+  lastUpdatedTimestamp: BigInt!
+  price: BigInt!
+  
+  # Add derived field for pool swaps
+  poolSwaps: [PoolSwap!]! @derivedFrom(field: "userHolding")
+}
+
+type CollectionTokenHoldingChange @entity(immutable: true) {
+  id: Bytes!
+  collectionToken: CollectionToken!
+  owner: User!
+  counterpartEOA: Bytes!
+  balanceAfter: BigInt!
+  balanceBefore: BigInt!
+  priceBefore: BigInt!
+  priceAfter: BigInt!
+  isIncrement: Boolean!
+  createdTx: Bytes!
+  created: BigInt!
+}
+
+# type CollectionTokenHoldingChangePNL @entity(immutable: true) {
+#   id: Bytes!
+#   token: CollectionToken!
+#   pnl: BigDecimal!
+#   amount: BigInt!
+#   entryPrice: BigDecimal!
+#   exitPrice: BigDecimal!
+#   owner: User!
+#   createdTx: Bytes!
+#   created: BigInt!
+# }
+
+
+type CollectionHolding @entity {
+  #ERC721 vault balance
+  id: Bytes! #User-tokenid
+  nftAddress: Bytes!
+  tokenId: BigInt!
+  owner: User!
+}
+
+type NFTLookup @entity(immutable: true) {
+  id: ID! #NFTAddress
+  collectionToken: CollectionToken!
+}
+
+type PoolCollectionLookup @entity(immutable: true) {
+  id: Bytes! #PoolId
+  collectionToken: CollectionToken!
+}
+
+type TreasuryManagerImplementation @entity {
+  id: Bytes! #Address
+  approvedAt: BigInt
+  unapprovedAt: BigInt
+}
+
+interface TreasuryManager {
+  id: Bytes! #Address
+  deployer: Bytes!
+  managerImplementation: Bytes!
+  holdings: [Collection!] @derivedFrom(field: "manager")
+  permissions: Bytes! # Address for the group permissions
+  createdAt: BigInt!
+}
+
+type RevenueManager implements TreasuryManager @entity {
+  id: Bytes! #Address
+  deployer: Bytes!
+  managerImplementation: Bytes!
+  holdings: [Collection!] @derivedFrom(field: "manager")
+  permissions: Bytes! # Address for the group permissions
+  createdAt: BigInt!
+
+  owner: User #Emitted with CreatorUpdated, updated with ManagerOwnershipTransferred
+  claims: [RevenueManagerClaim!] @derivedFrom(field: "revenueManager")
+  protocolFeeRecipient: User
+  protocolFee: BigInt
+}
+
+type RevenueManagerClaim @entity {
+  id: Bytes! #RevenueManager-txhash-logindex
+  revenueManager: RevenueManager!
+  isProtocol: Boolean!
+  collection: Collection
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  recipient: User!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type AddressFeeSplitManager implements TreasuryManager @entity {
+  id: Bytes! #Address
+  deployer: Bytes!
+  managerImplementation: Bytes!
+  holdings: [Collection!] @derivedFrom(field: "manager")
+  permissions: Bytes! # Address for the group permissions
+  createdAt: BigInt!
+
+  owner: User #Emitted with CreatorUpdated, updated with ManagerOwnershipTransferred
+  recipients: [AddressFeeSplitManagerRecipient!] @derivedFrom(field: "manager")
+  claims: [AddressFeeSplitManagerClaim!] @derivedFrom(field: "manager")
+  creatorShare: BigInt
+
+  externalManagerETH: [AddressFeeSplitManagerExternalETH!] @derivedFrom(field: "manager")
+  externalManagerETHTotal: BigInt!
+}
+
+type AddressFeeSplitManagerRecipient @entity {
+  id: Bytes! #ManagerAddress-Recipient
+  manager: AddressFeeSplitManager!
+  recipient: Bytes!
+  recipientShare: BigInt!
+}
+
+type AddressFeeSplitManagerClaim @entity {
+  id: Bytes! #RevenueManager-txhash-logindex
+  manager: AddressFeeSplitManager!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  recipient: User!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type StakingManager implements TreasuryManager @entity {
+  id: Bytes! # Address
+  deployer: Bytes!
+  managerImplementation: Bytes!
+  holdings: [Collection!] @derivedFrom(field: "manager")
+  permissions: Bytes! # Address for the group permissions
+  createdAt: BigInt!
+
+  owner: User # Emitted with CreatorUpdated, updated with ManagerOwnershipTransferred
+  stakes: [StakingManagerStake!] @derivedFrom(field: "manager")
+  stakesDeltas: [StakingManagerStakeDelta!] @derivedFrom(field: "manager")
+  claims: [StakingManagerClaim!] @derivedFrom(field: "manager")
+  escrows: [StakingManagerEscrow!] @derivedFrom(field: "manager")
+
+  stakingToken: Token!
+  minEscrowDuration: BigInt!
+  minStakeDuration: BigInt!
+  creatorShare: BigInt!
+  ownerShare: BigInt!
+
+  totalStaked: BigInt!
+  totalStakers: BigInt!
+
+  externalManagerETH: [StakingManagerExternalETH!] @derivedFrom(field: "manager")
+  externalManagerETHTotal: BigInt!
+}
+
+type StakingManagerStake @entity {
+  id: Bytes! # ManagerAddress-Staker
+  manager: StakingManager!
+  user: User!
+  amount: BigInt!
+  deltas: [StakingManagerStakeDelta!] @derivedFrom(field: "stake")
+  unlocksAt: BigInt!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+}
+
+type StakingManagerStakeDelta @entity {
+  id: Bytes! # ManagerAddress-Staker-txhash-logindex
+  manager: StakingManager!
+  user: User!
+  stake: StakingManagerStake!
+  amount: BigInt!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type StakingManagerEscrow @entity {
+  id: ID! # Flaunch-TokenId
+  manager: StakingManager!
+  collection: Collection!
+  timelockedUntil: BigInt!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  txHash: Bytes!
+}
+
+type StakingManagerClaim @entity {
+  id: Bytes! #StakingManager-txhash-logindex
+  manager: StakingManager!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  recipient: User!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type AddressFeeSplitManagerExternalETH @entity {
+  id: Bytes! #Manager-txhash-logindex
+  manager: AddressFeeSplitManager!
+  user: User!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type StakingManagerExternalETH @entity {
+  id: Bytes! #Manager-txhash-logindex
+  manager: StakingManager!
+  user: User!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type BuyBackManager implements TreasuryManager @entity {
+  id: Bytes! # Address
+  deployer: Bytes!
+  managerImplementation: Bytes!
+  holdings: [Collection!] @derivedFrom(field: "manager")
+  permissions: Bytes! # Address for the group permissions
+  createdAt: BigInt!
+
+  owner: User # Emitted with CreatorUpdated, updated with ManagerOwnershipTransferred
+  deposits: [BuyBackManagerDeposit!] @derivedFrom(field: "manager")
+  claims: [BuyBackManagerClaim!] @derivedFrom(field: "manager")
+
+  creatorShare: BigInt!
+  ownerShare: BigInt!
+
+  buyBackCurrency0: Bytes!
+  buyBackCurrency1: Bytes!
+
+  totalDeposits: BigInt!
+  totalDepositsUSDC: BigDecimal!
+
+  externalManagerETH: [BuyBackManagerExternalETH!] @derivedFrom(field: "manager")
+  externalManagerETHTotal: BigInt!
+}
+
+type BuyBackManagerDeposit @entity {
+  id: Bytes! #BuyBackManager-txhash-logindex
+  manager: BuyBackManager!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type BuyBackManagerClaim @entity {
+  id: Bytes! #BuyBackManager-txhash-logindex
+  manager: BuyBackManager!
+  collection: Collection
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  recipient: User!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type BuyBackManagerExternalETH @entity {
+  id: Bytes! #Manager-txhash-logindex
+  manager: BuyBackManager!
+  user: User!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+
+#ERC721
+type Collection @entity {
+  id: ID!
+  creator: User! #Initial Creator
+  owner: User! #Update when they transfer the ERC721
+  contract: Bytes!
+  collectionToken: CollectionToken
+  tokenID: BigInt!
+  name: String! # deprecated
+  symbol: String! # deprecated
+
+  manager: TreasuryManager
+  managerType: String
+  managerUpdatedAt: BigInt!
+}
+
+type CollectionMetadata @entity(immutable: true) {
+  id: ID!
+  name: String!
+  description: String!
+  logoHash: String!
+  symbol: String!
+  collectionToken: CollectionToken
+
+  # Optional data
+  website: String
+  discord: String
+  twitter: String
+  telegram: String
+}
+
+#ERC20
+type CollectionToken @entity {
+  # Information set when token is initialized via Locker.CollectionCreated
+  id: Bytes! #ERC20 Contract
+  collection: Collection! #721 Collection / NFTAddress
+
+  totalSupply: BigInt!
+  pool: Pool!
+
+  name: String!
+  symbol: String!
+  decimals: Int!
+  baseURI: String!
+  metadata: CollectionMetadata
+  createdAt: BigInt!
+  creator: User!
+  native: Boolean!              # Tracks holdings if true, uses another holding if false
+  importedToken: ImportedToken @derivedFrom(field: "collectionToken")
+  owner: User!                  # Update when they transfer the ERC721
+  marketCapETH: BigInt!         # unscaled
+  volumeETH: BigInt!            # redundant
+  marketCapUSDC: BigDecimal!    # unscaled
+  volumeUSDC: BigDecimal!       # redundant
+  totalFeesETH: BigInt!         
+  totalFeesUSDC: BigDecimal!    
+  derivedETH: BigInt!           # unscaled
+
+  # running total fees for Community
+  totalCommunityFeesETH: BigDecimal!
+  # running total fees for Creator
+  totalCreatorFeesETH: BigDecimal!
+  tokenPrice: BigInt!
+  totalHolders: BigInt! 
+  creationFee: BigInt!
+  fairLaunch: FairLaunch
+  dayData: [TokenDayData!] @derivedFrom(field: "token")
+  hourData: [TokenHourData!] @derivedFrom(field: "token")
+  minuteData: [TokenMinuteData!] @derivedFrom(field: "token")
+  fifteenMinuteData: [Token15MinuteData!] @derivedFrom(field: "token")
+  fourHourData: [Token4HourData!] @derivedFrom(field: "token")
+  holdings: [CollectionTokenHolding!] @derivedFrom(field: "collectionToken")
+
+  # Archive helpers
+  lastMinuteArchived: BigInt!
+  lastHourArchived: BigInt!
+  lastFifteenMinuteArchived: BigInt!
+  lastFourHourArchived: BigInt!
+
+  # Archive helpers
+  minuteArray: [Int!]!
+  hourArray: [Int!]!
+  fifteenMinuteArray: [Int!]!
+  fourHourArray: [Int!]!
+
+  # Archive helpers
+  lastMinuteRecorded: BigInt!
+  lastHourRecorded: BigInt!
+  lastFifteenMinuteRecorded: BigInt!
+  lastFourHourRecorded: BigInt!
+}
+
+
+# BID WALL
+
+type BidWall @entity {
+  # # event BidWallInitialized(PoolId _poolId, uint _eth, int24 _tickLower, int24 _tickUpper);
+  # # event BidWallRepositioned(PoolId _poolId, uint _eth, int24 _tickLower, int24 _tickUpper);
+  # # event BidWallClosed(PoolId _poolId, address _recipient, uint _eth);
+  id: Bytes! #PoolID - Will be first set by `BidWallInitialized`
+  contract: Bytes! # The address of the BidWall contract
+  collectionToken: CollectionToken!
+  pool: Pool!
+  # Enabled by `BidWallInitialized` and disabled by `BidWallClosed`
+  initialized: Boolean!
+  # Bidwall tick range updated by `BidWallInitialized` and `BidWallRepositioned`
+  tickLower: BigInt!
+  tickUpper: BigInt!
+  # Amount deposited in the BidWall. This will be cumulative.
+  amount: BigInt! # redundant
+  balance: BigInt!
+  deployedETH: BigInt!
+  closed: Boolean!
+  
+  distributions: [BidWallDistribution!] @derivedFrom(field: "bidWall")
+}
+
+
+# TODO CHECK ON THIS BOY
+type BidWallDistribution @entity {
+  # # event BidWallRewardsTransferred(PoolId _poolId, address _recipient, uint _tokens);
+  # # event BidWallClosed(PoolId _poolId, address _recipient, uint _eth);
+  id: Bytes! #PoolId-Txhash
+  bidWall: BidWall!
+  collectionToken: CollectionToken!
+  amount: BigInt!
+  recipient: User!
+}
+
+# Fair Launch
+
+type FairLaunch @entity {
+  ## event FairLaunchEnded(PoolId _poolId, int24 _tickLower, int24 _tickUpper, uint _tokenSupply, uint _endedAt);
+
+  id: Bytes! #PoolId
+  # Enabled by `FairLaunchStarted` and disabled by `FairLaunchEnded`
+  active: Boolean!
+  collectionToken: CollectionToken!
+
+  # Set by `FairLaunchStarted`
+  tick: Int!
+  initialSupply: BigInt!
+
+  # Set by `FairLaunchEnded` by taking the `_ethEarned` and `_tokensRemaining`
+  ethEarned: BigInt! #unscaled
+  soldInitialSupply: BigInt!
+
+  # Capture the `starts_at` timestamp from when the `FairLaunchStarted` # event is emitted, and
+  # the `ends_at` timestamp from the start time plus the `FAIR_LAUNCH_WINDOW` timestamp.
+  starts_at: BigInt!
+  ends_at: BigInt!
+}
+
+type FeeDistribution @entity {
+  # event FeeDistributionUpdated(FeeDistribution _feeDistribution);
+  # event CreatorFeeAllocationUpdated(PoolId _poolId, uint24 _allocation);
+
+  # Set by `FeeDistributionUpdated`
+  id: Bytes! # PoolId
+  swapFee: Int
+  referrer: Int # Priority 1
+  protocol: Int # Priority 2
+  community: Int # Priority 4 (crumbs from others)
+  active: Boolean
+
+  # Set by `CreatorFeeAllocationUpdated`
+  creator: Int # Priority 3
+}
+
+type FeeExemption @entity {
+  # event BeneficiaryFeeSet(address _beneficiary, uint24 _flatFee);
+  # event BeneficiaryFeeRemoved(address _beneficiary);
+  id: Bytes! # Wallet Address
+  flatFee: Int!
+}
+
+type FlaunchFeeExemption @entity {
+  # event FeeExemptionUpdated(address indexed _beneficiary, bool _excluded);
+  id: Bytes! # Wallet Address
+  createdAt: BigInt!
+}
+
+type PoolPremine @entity {
+  id: Bytes!
+  receiver: User!
+  pool: Pool!
+  amount: BigInt!
+}
+
+type FlayBurner @entity {
+  id: Bytes!            # Constant
+  address: Bytes!       # The address of the FlayBurner
+  pendingETH: BigInt!   # The amount of ETH waiting to go into the position
+  totalBurned: BigInt!  # The total amount of flETH that has been burned
+  createdAt: BigInt!    # When the FlayBurner was set
+}
+
+type ReferralEscrowAssigned @entity(immutable: true) {
+  id: Bytes!
+  amount: BigInt!
+  receiver: User!
+  token: CollectionToken!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type ReferralEscrowClaimed @entity(immutable: true) {
+  id: Bytes!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  receiver: User!
+  token: CollectionToken!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type ReferralEscrowSwapped @entity(immutable: true) {
+  id: Bytes!
+  ethOut: BigInt!
+  tokensIn: BigInt!
+  receiver: User!
+  token: CollectionToken!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+
+
+type Pool @entity {
+  # event PoolCreated(PoolId _poolId, uint _initialTokenFairLaunch, uint _fairLaunchEnds, address _collection, address _collectionToken, address _creator);
+  # event PoolStateUpdated(PoolId _poolId, uint160 _sqrtPriceX96, int24 _tick, uint24 _protocolFee, uint24 _swapFee, uint128 _liquidity);
+
+  # event FeeDistributionUpdated(FeeDistribution _feeDistribution);
+  # event PoolFeeDistributionUpdated(PoolId _poolId, FeeDistribution _feeDistribution);
+
+  id: Bytes! # PoolId
+  #/ The owner / dev of the token. This is set by `PoolCreated` and is updated by when the ERC721 that
+  #/ is minted when `flaunch` is called is transferred.
+  # creator: User!
+
+  collectionToken: CollectionToken! #if you need ERC721 info its in this guy
+  # string collectionTokenUri; - On collection
+
+  # Uniswap V4 pool `slot0` values updated via `PoolStateUpdated`
+  sqrtPriceX96: BigInt!
+  tick: Int!
+
+  # protocolFee: BigInt!
+  # swapFee: BigInt!
+  liveAtTimestamp: BigInt!
+
+  startingMarketCap: BigInt!
+  startingMarketCapETH: BigInt!  # todo: deprecate
+
+  poolFees: PoolFees
+  bidWall: BidWall
+  feeDistribution: FeeDistribution # redundant
+  volumeETH: BigInt!
+  volumeUSDC: BigDecimal!
+  totalFeesETH: BigInt!
+  totalFeesToken: BigInt!
+  totalFeesUSDC: BigDecimal!
+  totalFeesTokenConverted: BigInt! # redundant
+  memecoinTreasury: MemecoinTreasury
+
+  # running total fees for Community
+  totalCommunityFeesETH: BigDecimal!
+  # running total fees for Creator
+  totalCreatorFeesETH: BigDecimal!
+  ispEthIn: BigInt!
+  ispTokenOut: BigInt!
+  liquidity: BigInt!
+  tickSpacing: Int!
+  fairLaunchedEnded: Boolean!
+  feeAllocation: FeeAllocation
+  # If false, token0 is native token (e.g. flETH)
+  flipped: Boolean!
+  swaps: [PoolSwap!] @derivedFrom(field: "pool")
+
+  # The {PositionManager} address used to create the Pool
+  positionManager: Bytes!
+}
+
+type FeeAllocation @entity {
+  id: Bytes!
+  community: Int!
+  creator: Int!
+}
+
+type PoolSwap @entity(immutable: true) {
+  id: Bytes! # PoolId + txhash + logindex
+  maker: User!
+  timestamp: BigInt!
+  txHash: Bytes!
+  pool: Pool!
+  fairLaunchAmount0: BigInt
+  fairLaunchAmount1: BigInt
+  ispAmount0: BigInt
+  ispAmount1: BigInt
+  uniswapAmount0: BigInt
+  uniswapAmount1: BigInt
+  fairLaunchFee0: BigInt
+  fairLaunchFee1: BigInt
+  ispFee0: BigInt
+  ispFee1: BigInt
+  uniswapFee0: BigInt
+  uniswapFee1: BigInt
+  flAmountUSDC: BigDecimal
+  ispAmountUSDC: BigDecimal
+  uniAmountUSDC: BigDecimal
+  totalAmountUSDC: BigDecimal
+  type: ActivityType!
+  
+  # Add reference to user's holding
+  userHolding: CollectionTokenHolding
+}
+
+type PoolFees @entity {
+  #/ Emitted when a pool has been allocated fees on either side of the position
+  # event PoolFeesReceived(PoolId _poolId, uint _amount0, uint _amount1);
+  id: Bytes! # PoolId
+  #/ The amount of token0 and token1 that is currently available. The will be incremented by
+  #/ `PoolFeesReceived` and decremented by `PoolFeesDistributed`.
+  ethAvailable: BigInt!
+  tokenAvailable: BigInt!
+
+  #/ The amount of token0 and token1 that has been added from all time. The will be incremented
+  #/ by `PoolFeesReceived`.
+  totalTokenIn: BigInt!
+  totalEthIn: BigInt!
+}
+
+type PoolFeeDistribution @entity(immutable: true) {
+  # event PoolFeesDistributed(PoolId _poolId, uint _amount0);
+
+  id: Bytes! # txhash-poolid
+  timestamp: BigInt!
+  pool: Pool!
+  amount: BigInt!
+  creatorAmount: BigInt!
+  bidWallAmount: BigInt!
+  governanceAmount: BigInt!
+  protocolAmount: BigInt!
+}
+
+type UserFee @entity {
+  # event Deposit(PoolId _poolId, address _payee, address _token, uint _amount);
+  # event Withdrawal(address _payee, address _token, uint _amount);
+
+  # Unique identifier based on the recipient (payee) address
+  id: Bytes! # Payee
+  # The address of the payee / recipient
+  payee: User!
+  # The amount of token available. This entity will either be created by TokenEscrow.Deposit and
+  # the amount value will be updated by both TokenEscrow.Deposit and TokenEscrow.Withdrawal.
+  claimableAmount: BigInt!
+  claimableAmountUSDC: BigDecimal!
+  lifetimeFees: BigInt!
+  claims: [UserFeeClaimed!] @derivedFrom(field: "payee")
+  totalClaimed: BigInt!
+  totalClaimedUSDC: BigDecimal!
+
+  # When the last deposit was made
+  updatedAt: BigInt!
+}
+
+type UserFeeClaimed @entity(immutable: true) {
+  id: Bytes! # txhash
+  payee: UserFee!
+  amount: BigInt!
+  amountUSDC: BigDecimal!
+  date: BigInt!
+  txHash: Bytes!
+}
+
+type UserCollectionFee @entity {
+  id: Bytes! #user/pool
+  user: User!
+  collectionToken: CollectionToken!
+  lifetimeFees: BigInt! #Cumulative Fee for each collection
+  # When the last deposit was made
+  updatedAt: BigInt!
+}
+
+type CollectionFee @entity {
+  id: Bytes! # pool
+  lifetimeFees: BigInt! #Cumulative Fee for each collection
+  # When the last deposit was made
+  updatedAt: BigInt!
+}
+
+type ReferrerFee @entity(immutable: true) {
+  # event ReferrerFeePaid(PoolId _poolId, address _recipient, address _token, uint _amount);
+
+  id: Bytes! # transactionHash-logindex
+  pool: Pool!
+  recipient: User!
+  txHash: Bytes!
+  isETH: Boolean!
+  token: CollectionToken
+  amount: BigInt!
+  amountInETH: BigInt!
+  timestamp: BigInt!
+}
+
+
+type TokenDayData @entity {
+  # token address concatendated with date
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: Int!
+  # unix timestamp for start of day
+  periodStartUnix: Int!
+  # pointer to token
+  token: CollectionToken!
+
+  pool: Pool!
+  # volume in derived ETH
+  volumeETH: BigInt!
+  # volume in USD
+  volumeUSDC: BigDecimal!
+  # running total volume in derived ETH
+  totalVolumeETH: BigInt!
+  # running total volume in USD
+  totalVolumeUSDC: BigDecimal!
+  marketCapETH: BigInt!
+  # market cap in USD
+  marketCapUSDC: BigDecimal!
+  # price at end of period in ETH
+  priceETH: BigInt!
+  # price at end of period in USD
+  priceUSDC: BigDecimal!
+  # fees in ETH
+  feesETH: BigInt!
+  # fees in USD
+  feesUSDC: BigDecimal!
+  # running total fees in derived ETH
+  totalFeesETH: BigInt!
+  # running total fees in USD
+  totalFeesUSDC: BigDecimal!
+  # # fees for Community
+  # communityFeesETH: BigDecimal!
+  # # fees for Creator
+  # creatorFeesETH: BigDecimal!
+  # # running total fees for Community
+  # totalCommunityFeesETH: BigDecimal!
+  # # running total fees for Creator
+  # totalCreatorFeesETH: BigDecimal!
+  # opening price ETH
+  open: BigInt!
+  # opening price USD
+  openUSDC: BigDecimal!
+  # high price ETH
+  high: BigInt!
+  # high price USD
+  highUSDC: BigDecimal!
+  # low price ETH
+  low: BigInt!
+  # low price USD
+  lowUSDC: BigDecimal!
+  # close price ETH
+  close: BigInt!
+  # close price USD
+  closeUSDC: BigDecimal!
+}
+
+
+type TokenHourData @entity {
+  # token address concatendated with date
+  id: ID!
+  # unix timestamp for start of hour
+  periodStartUnix: Int!
+  # pointer to token
+  token: CollectionToken!
+
+  pool: Pool!
+  # volume in derived ETH
+  volumeETH: BigInt!
+  # volume in USD
+  volumeUSDC: BigDecimal!
+  # running total volume in derived ETH
+  totalVolumeETH: BigInt!
+  # running total volume in USD
+  totalVolumeUSDC: BigDecimal!
+  marketCapETH: BigInt!
+  # market cap in USD
+  marketCapUSDC: BigDecimal!
+  # price at end of period in ETH
+  priceETH: BigInt!
+  # price at end of period in USD
+  priceUSDC: BigDecimal!
+  # fees in ETH
+  feesETH: BigInt!
+  # fees in USD
+  feesUSDC: BigDecimal!
+  # running total fees in derived ETH
+  totalFeesETH: BigInt!
+  # running total fees in USD
+  totalFeesUSDC: BigDecimal!
+  # # fees for Community
+  # communityFeesETH: BigDecimal!
+  # # fees for Creator
+  # creatorFeesETH: BigDecimal!
+  # # running total fees for Community
+  # totalCommunityFeesETH: BigDecimal!
+  # # running total fees for Creator
+  # totalCreatorFeesETH: BigDecimal!
+  # opening price ETH
+  open: BigInt!
+  # opening price USD
+  openUSDC: BigDecimal!
+  # high price ETH
+  high: BigInt!
+  # high price USD
+  highUSDC: BigDecimal!
+  # low price ETH
+  low: BigInt!
+  # low price USD
+  lowUSDC: BigDecimal!
+  # close price ETH
+  close: BigInt!
+  # close price USD
+  closeUSDC: BigDecimal!
+}
+
+type TokenMinuteData @entity {
+  # token address concatendated with date
+  id: ID!
+  # unix timestamp for start of minute
+  periodStartUnix: Int!
+  # pointer to token
+  token: CollectionToken!
+  # volume in derived ETH
+  volumeETH: BigInt!
+  # volume in USD
+  volumeUSDC: BigDecimal!
+  # running total volume in derived ETH
+  totalVolumeETH: BigInt!
+  # running total volume in USD
+  totalVolumeUSDC: BigDecimal!
+  marketCapETH: BigInt!
+  # market cap in USD
+  marketCapUSDC: BigDecimal!
+  # price at end of period in ETH
+  priceETH: BigInt!
+  # price at end of period in USD
+  priceUSDC: BigDecimal!
+  # fees in ETH
+  feesETH: BigInt!
+  # fees in USD
+  feesUSDC: BigDecimal!
+   # running total fees in derived ETH
+  totalFeesETH: BigInt!
+  # running total fees in USD
+  totalFeesUSDC: BigDecimal!
+  # # fees for Community
+  # communityFeesETH: BigDecimal!
+  # # fees for Creator
+  # creatorFeesETH: BigDecimal!
+  # # running total fees for Community
+  # totalCommunityFeesETH: BigDecimal!
+  # # running total fees for Creator
+  # totalCreatorFeesETH: BigDecimal!
+  # opening price ETH
+  open: BigInt!
+  # opening price USD
+  openUSDC: BigDecimal!
+  # high price ETH
+  high: BigInt!
+  # high price USD
+  highUSDC: BigDecimal!
+  # low price ETH
+  low: BigInt!
+  # low price USD
+  lowUSDC: BigDecimal!
+  # close price ETH
+  close: BigInt!
+  # close price USD
+  closeUSDC: BigDecimal!
+}
+
+type Token15MinuteData @entity {
+  # token address concatendated with date
+  id: ID!
+  # unix timestamp for start of 15-minute period
+  periodStartUnix: Int!
+  # pointer to token
+  token: CollectionToken!
+  # volume in derived ETH
+  volumeETH: BigInt!
+  # volume in USD
+  volumeUSDC: BigDecimal!
+  # running total volume in derived ETH
+  totalVolumeETH: BigInt!
+  # running total volume in USD
+  totalVolumeUSDC: BigDecimal!
+  marketCapETH: BigInt!
+  # market cap in USD
+  marketCapUSDC: BigDecimal!
+  # price at end of period in ETH
+  priceETH: BigInt!
+  # price at end of period in USD
+  priceUSDC: BigDecimal!
+  # fees in ETH
+  feesETH: BigInt!
+  # fees in USD
+  feesUSDC: BigDecimal!
+   # running total fees in derived ETH
+  totalFeesETH: BigInt!
+  # running total fees in USD
+  totalFeesUSDC: BigDecimal!
+  # opening price ETH
+  open: BigInt!
+  # opening price USD
+  openUSDC: BigDecimal!
+  # high price ETH
+  high: BigInt!
+  # high price USD
+  highUSDC: BigDecimal!
+  # low price ETH
+  low: BigInt!
+  # low price USD
+  lowUSDC: BigDecimal!
+  # close price ETH
+  close: BigInt!
+  # close price USD
+  closeUSDC: BigDecimal!
+}
+
+type Token4HourData @entity {
+  # token address concatendated with date
+  id: ID!
+  # unix timestamp for start of 4-hour period
+  periodStartUnix: Int!
+  # pointer to token
+  token: CollectionToken!
+  # volume in derived ETH
+  volumeETH: BigInt!
+  # volume in USD
+  volumeUSDC: BigDecimal!
+  # running total volume in derived ETH
+  totalVolumeETH: BigInt!
+  # running total volume in USD
+  totalVolumeUSDC: BigDecimal!
+  marketCapETH: BigInt!
+  # market cap in USD
+  marketCapUSDC: BigDecimal!
+  # price at end of period in ETH
+  priceETH: BigInt!
+  # price at end of period in USD
+  priceUSDC: BigDecimal!
+  # fees in ETH
+  feesETH: BigInt!
+  # fees in USD
+  feesUSDC: BigDecimal!
+   # running total fees in derived ETH
+  totalFeesETH: BigInt!
+  # running total fees in USD
+  totalFeesUSDC: BigDecimal!
+  # opening price ETH
+  open: BigInt!
+  # opening price USD
+  openUSDC: BigDecimal!
+  # high price ETH
+  high: BigInt!
+  # high price USD
+  highUSDC: BigDecimal!
+  # low price ETH
+  low: BigInt!
+  # low price USD
+  lowUSDC: BigDecimal!
+  # close price ETH
+  close: BigInt!
+  # close price USD
+  closeUSDC: BigDecimal!
+}
+
+# Add a Bundle entity to track ETH price in USD
+type Bundle @entity {
+  id: ID!
+  ethPriceUSDC: BigDecimal!
+}
+
+# Activity Events 
+
+# Swaps 
+
+# type BidWallClosed @entity(immutable: true) {
+#   id: Bytes!
+#   _poolId: Bytes! # bytes32
+#   _recipient: Bytes! # address
+#   _eth: BigInt! # uint256
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+type BidWallRepositioned @entity(immutable: true) {
+  id: Bytes!
+  pool: Pool!
+  _eth: BigInt! # uint256
+  _tickLower: Int! # int24
+  _tickUpper: Int! # int24
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# type BidWallRewardsTransferred @entity(immutable: true) {
+#   id: Bytes!
+#   _poolId: Bytes! # bytes32
+#   _recipient: Bytes! # address
+#   _tokens: BigInt! # uint256
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type OwnershipHandoverCanceled @entity(immutable: true) {
+#   id: Bytes!
+#   pendingOwner: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type OwnershipHandoverRequested @entity(immutable: true) {
+#   id: Bytes!
+#   pendingOwner: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type OwnershipTransferred @entity(immutable: true) {
+#   id: Bytes!
+#   oldOwner: Bytes! # address
+#   newOwner: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+# type InitialSqrtPriceX96Updated @entity(immutable: true) {
+#   id: Bytes!
+#   _unflipped: BigInt! # uint160
+#   _flipped: BigInt! # uint160
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+
+type Activity @entity(immutable: true) {
+  id: Bytes! # txhash-logindex
+  maker: User!
+  timestamp: BigInt!
+  txHash: Bytes!
+  token: CollectionToken!
+  amountETH: BigInt!
+  amountToken: BigInt!
+  type: ActivityType!
+}
+
+enum ActivityType {
+  Buy,
+  Sell
+}
+
+type MemecoinTreasury @entity {
+  id: Bytes! # treasury address
+  pool: Pool!
+  activities: [MemecoinTreasuryActivity!] @derivedFrom(field: "treasury")
+  createdAt: BigInt!
+  totalActions: BigInt!
+  lastActionTimestamp: BigInt!
+  totalETH: BigInt!
+  totalToken: BigInt!
+}
+
+type MemecoinTreasuryActivity @entity {
+  id: Bytes! # treasury address + tx hash + log index
+  pool: Pool
+  treasury: MemecoinTreasury
+  action: MemecoinAction!
+  tokenDelta0: BigInt! # Change in token0 balance
+  tokenDelta1: BigInt! # Change in token1 balance
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type MemecoinAction @entity {
+  id: Bytes! # action contract address
+  approved: Boolean!
+  activities: [MemecoinTreasuryActivity!] @derivedFrom(field: "action")
+  approvedAt: BigInt
+  unapprovedAt: BigInt
+  totalActions: BigInt!
+
+  approvedBy: Bytes # address of who approved it
+  unapprovedBy: Bytes # address of who unapproved it
+}
+# type CreatorUpdated @entity(immutable: true) {
+#   id: Bytes!
+#   _creator: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type ManagerInitialized @entity(immutable: true) {
+#   id: Bytes!
+#   _tokenId: BigInt! # uint256
+#   _params_creator: Bytes! # address
+#   _params_protocolRecipient: Bytes! # address
+#   _params_protocolFee: BigInt! # uint256
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+
+# type ProtocolFeeUpdated @entity(immutable: true) {
+#   id: Bytes!
+#   _protocolFee: BigInt! # uint256
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type ProtocolRecipientUpdated @entity(immutable: true) {
+#   id: Bytes!
+#   _protocolRecipient: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type TreasuryEscrowed @entity(immutable: true) {
+#   id: Bytes!
+#   _tokenId: BigInt! # uint256
+#   _owner: Bytes! # address
+#   _sender: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+# type TreasuryReclaimed @entity(immutable: true) {
+#   id: Bytes!
+#   _tokenId: BigInt! # uint256
+#   _sender: Bytes! # address
+#   _recipient: Bytes! # address
+#   blockNumber: BigInt!
+#   blockTimestamp: BigInt!
+#   transactionHash: Bytes!
+# }
+
+type ImportedToken @entity {
+  id: Bytes!                         # Address of the imported token
+  collectionToken: CollectionToken!  # The collection token schema linked to the imported token
+  verifier: Bytes!                   # The address of the verifier that approved it
+  sender: Bytes!                     # The address of the transaction sender
+  importedAt: BigInt!                # The block timestamp that the token was imported
+  txHash: Bytes!                     # The hash of the transaction
+}
+
+type TokenImporterVerifier @entity {
+  id: Bytes!  # The address of the verifier
+}
+
+type FlaunchApproval @entity {
+  id: Bytes! # flaunchAddr-owner-operator
+  owner: User!
+  operator: User!
+  flaunchAddr: Bytes!
+  tokens: [FlaunchApprovalToken!] @derivedFrom(field: "flaunchApproval")
+  globalApproval: Boolean!
+}
+
+type FlaunchApprovalToken @entity {
+  id: Bytes! # flaunchAddr-owner-tokenId
+  flaunchApproval: FlaunchApproval!
+  tokenId: BigInt!
+  collection: Collection
+  createdAt: BigInt!
+  txHash: Bytes!
+}
+
+type Token @entity {
+  id: Bytes! # Address
+  name: String!
+  symbol: String!
+  decimals: Int!
+  totalSupply: BigInt!
+}
