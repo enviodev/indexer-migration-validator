@@ -1,7 +1,7 @@
 {
-  "name": "flaunch-comparison",
+  "name": "indexer-migration-validator",
   "version": "1.0.0",
-  "description": "Compare Flaunch subgraph vs HyperIndex data",
+  "description": "Compare subgraph vs HyperIndex GraphQL results to validate indexer migrations",
   "type": "module",
   "scripts": {
     "compare": "tsx src/index.ts",

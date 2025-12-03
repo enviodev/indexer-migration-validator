@@ -1,4 +1,4 @@
-# Subgraph vs HyperIndex Comparison Tool
+# Indexer Migration Validator
 
 A TypeScript CLI tool for validating data correctness when migrating from TheGraph subgraphs to Envio HyperIndex indexers.
 
@@ -8,6 +8,7 @@ This tool queries both a subgraph and a HyperIndex endpoint, compares the return
 
 ## Features
 
+- **Schema-driven**: Automatically generates entity configs from GraphQL schema files
 - **Sample Mode**: Quick comparison using random samples (default)
 - **Deep Mode**: Full comparison with pagination for thorough validation
 - **Field-level diffing**: Shows exact field differences with percentage variance for numeric fields
@@ -20,6 +21,22 @@ This tool queries both a subgraph and a HyperIndex endpoint, compares the return
 ```bash
 pnpm install
 ```
+
+## Quick Start
+
+1. **Set up your environment** - Copy `.env.example` to `.env` and configure your endpoints:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Add your schema files** - Place your GraphQL schema files in the project root:
+   - `subgraph-schema.graphql` - Your subgraph's GraphQL schema
+   - `hyperindex-schema.graphql` - Your HyperIndex GraphQL schema
+
+3. **Run comparison**:
+   ```bash
+   pnpm compare
+   ```
 
 ## Usage
 
@@ -39,7 +56,7 @@ pnpm compare --sample 200
 pnpm compare --deep --entity Pool
 
 # Deep comparison with limit
-pnpm compare --deep-limit 1000 --entity CollectionToken
+pnpm compare --deep-limit 1000 --entity Token
 
 # Skip JSON report generation
 pnpm compare --no-json
@@ -58,56 +75,53 @@ pnpm compare --help
 | `--deep-limit <n>` | Deep comparison with max N records per entity |
 | `--output <path>` | Custom output path for JSON report |
 | `--no-json` | Skip JSON report generation |
+| `--subgraph-schema <path>` | Path to subgraph schema file |
+| `--hyperindex-schema <path>` | Path to HyperIndex schema file |
+| `--generate-config` | Generate entity config from schemas and exit |
 | `--help, -h` | Show help |
-
-### Examples
-
-```bash
-# Quick validation of Pool entity
-pnpm compare --entity Pool --sample 100
-
-# Full validation of all Pool records
-pnpm compare --deep --entity Pool
-
-# Compare multiple entities with larger sample
-pnpm compare --sample 200
-
-# Deep compare with limit to avoid long runtimes
-pnpm compare --deep-limit 5000
-```
 
 ## Configuration
 
-Edit `src/config.ts` to configure:
+### Environment Variables
 
-### Endpoints
+Create a `.env` file with your endpoints:
 
-```typescript
-export const SUBGRAPH_URL = 'https://your-subgraph-endpoint';
-export const HYPERINDEX_URL = 'https://your-hyperindex-endpoint/v1/graphql';
+```env
+# GraphQL endpoints (required)
+SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/your-subgraph
+HYPERINDEX_URL=https://your-indexer.hyperindex.xyz/v1/graphql
+
+# Schema file paths (optional, defaults shown)
+SUBGRAPH_SCHEMA=./subgraph-schema.graphql
+HYPERINDEX_SCHEMA=./hyperindex-schema.graphql
+OVERRIDES_PATH=./overrides.json
 ```
 
-### Entity Configuration
+### Overrides File
 
-Each entity needs configuration mapping between subgraph and HyperIndex naming conventions:
+Create an `overrides.json` file to handle field mappings and known issues:
 
-```typescript
-export const ENTITY_CONFIGS = {
-  Pool: {
-    subgraphName: 'pools',           // Subgraph query name (plural, camelCase)
-    hyperindexName: 'Pool',          // HyperIndex query name (PascalCase)
-    fields: ['id', 'sqrtPriceX96', 'tick', 'volumeETH'],  // Fields to compare
-    nestedFields: {
-      'collectionToken': 'collectionToken_id'  // Subgraph nested -> HyperIndex flat
-    },
-    fieldMapping: {},                // Optional: rename fields between systems
-    knownIdMismatch: false           // Set true if ID formats differ
+```json
+{
+  "fieldMappings": {
+    "EntityName": {
+      "subgraphFieldName": "hyperindexFieldName"
+    }
   },
-  // ... more entities
-};
+  "knownIdMismatch": [
+    "EntityWithDifferentIdFormat"
+  ],
+  "skipEntities": [
+    "EntityToSkip"
+  ]
+}
 ```
+
+See `overrides.template.json` for a blank template.
 
 ### Key Differences Handled
+
+The tool automatically handles common differences between subgraph and HyperIndex:
 
 | Subgraph | HyperIndex |
 |----------|------------|
@@ -153,17 +167,17 @@ Saved to `output/comparison-YYYY-MM-DD_HH-MM-SS.json` with full diff details:
 }
 ```
 
-## Adapting for Other Migrations
+## Examples
 
-To use this tool for a different subgraph migration:
+The `examples/` directory contains real-world migration examples:
 
-1. **Update endpoints** in `src/config.ts`
-2. **Configure entities** by adding entries to `ENTITY_CONFIGS`:
-   - Map subgraph plural names to HyperIndex singular names
-   - List fields to compare
-   - Map nested fields to flat foreign key fields
-3. **Handle ID mismatches**: Set `knownIdMismatch: true` for entities where ID generation differs
-4. **Run comparison** and iterate on fixes
+- **examples/flaunch/** - Flaunch protocol migration with 66 entities
+
+Each example includes:
+- `subgraph-schema.graphql` - The original subgraph schema
+- `hyperindex-schema.graphql` - The migrated HyperIndex schema
+- `overrides.json` - Field mappings and known issues
+- `README.md` - Migration-specific notes
 
 ## Known Limitations
 
@@ -177,7 +191,7 @@ To use this tool for a different subgraph migration:
 
 Either:
 - The entity has no data in one or both sources
-- ID formats differ between systems (set `knownIdMismatch: true`)
+- ID formats differ between systems (add to `knownIdMismatch` in overrides.json)
 
 ### Timeout errors
 
@@ -187,4 +201,8 @@ Either:
 ### Field not found errors
 
 - Verify field names match between schema and config
-- Check for renamed fields in HyperIndex schema
+- Check for renamed fields and add to `fieldMappings` in overrides.json
+
+## License
+
+MIT

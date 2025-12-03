@@ -37,7 +37,12 @@ function buildDataQuery(entityName: string, ids: string[]): string {
   const idsString = ids.map(id => `"${id}"`).join(', ');
 
   // Build field selection - HyperIndex uses _id suffix for foreign keys
-  const fields: string[] = [...config.fields];
+  // Translate renamed fields from subgraph names to hyperindex names
+  const fieldMapping = config.fieldMapping || {};
+  const fields: string[] = config.fields.map(field =>
+    fieldMapping[field] || field
+  );
+
   for (const [, hyperindexField] of Object.entries(config.nestedFields)) {
     fields.push(hyperindexField);
   }

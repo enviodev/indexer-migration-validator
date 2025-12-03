@@ -23,13 +23,29 @@ export function printEntityDiff(diff: EntityDiff): void {
   const significantMismatches = getSignificantMismatches(diff);
   const hasIssues = diff.missingInHyperindex.length > 0 ||
                     diff.missingInSubgraph.length > 0 ||
-                    significantMismatches.length > 0;
+                    significantMismatches.length > 0 ||
+                    diff.suspectedIdMismatch;
 
   console.log('\n' + c('bold', `=== ${diff.entityName} ===`));
 
   // Counts
   console.log(`  Records: Subgraph=${c('cyan', String(diff.subgraphCount))}, HyperIndex=${c('cyan', String(diff.hyperindexCount))}`);
   console.log(`  Compared: ${c('green', String(diff.matchedCount))} matched, ${c('yellow', String(diff.mismatchedCount))} with differences`);
+
+  // Suspected ID format mismatch
+  if (diff.suspectedIdMismatch) {
+    console.log(`  ${c('red', '⚠ SUSPECTED ID FORMAT MISMATCH!')}`);
+    console.log(`  Both sources have records but NO common IDs found.`);
+    console.log(`  This likely means the ID generation differs between subgraph and hyperindex.`);
+    if (diff.sampleSubgraphIds && diff.sampleSubgraphIds.length > 0) {
+      console.log(`  Sample Subgraph IDs:`);
+      diff.sampleSubgraphIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+    }
+    if (diff.sampleHyperindexIds && diff.sampleHyperindexIds.length > 0) {
+      console.log(`  Sample HyperIndex IDs:`);
+      diff.sampleHyperindexIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+    }
+  }
 
   // Missing records
   if (diff.missingInHyperindex.length > 0) {
@@ -99,7 +115,7 @@ export function printSummary(diffs: EntityDiff[]): void {
   let totalMissingInHyperindex = 0;
   let totalMissingInSubgraph = 0;
 
-  const entityStats: { name: string; status: 'ok' | 'warn' | 'error' }[] = [];
+  const entityStats: { name: string; status: 'ok' | 'warn' | 'error'; idMismatch?: boolean }[] = [];
 
   for (const diff of diffs) {
     totalSubgraph += diff.subgraphCount;
@@ -111,12 +127,12 @@ export function printSummary(diffs: EntityDiff[]): void {
 
     const significantMismatches = getSignificantMismatches(diff);
     let status: 'ok' | 'warn' | 'error' = 'ok';
-    if (diff.missingInHyperindex.length > 0 || significantMismatches.length > 0) {
+    if (diff.suspectedIdMismatch || diff.missingInHyperindex.length > 0 || significantMismatches.length > 0) {
       status = 'error';
     } else if (diff.missingInSubgraph.length > 0 || diff.mismatchedCount > 0) {
       status = 'warn';
     }
-    entityStats.push({ name: diff.entityName, status });
+    entityStats.push({ name: diff.entityName, status, idMismatch: diff.suspectedIdMismatch });
   }
 
   // Entity status list
@@ -125,10 +141,12 @@ export function printSummary(diffs: EntityDiff[]): void {
     const icon = stat.status === 'ok' ? c('green', 'OK') :
                  stat.status === 'warn' ? c('yellow', 'WARN') :
                  c('red', 'ERR');
-    console.log(`  [${icon}] ${stat.name}`);
+    const idMismatchNote = stat.idMismatch ? c('red', ' (ID MISMATCH)') : '';
+    console.log(`  [${icon}] ${stat.name}${idMismatchNote}`);
   }
 
   // Totals
+  const idMismatchCount = entityStats.filter(s => s.idMismatch).length;
   console.log('\nTotals:');
   console.log(`  Total Subgraph Records: ${totalSubgraph}`);
   console.log(`  Total HyperIndex Records: ${totalHyperindex}`);
@@ -136,6 +154,9 @@ export function printSummary(diffs: EntityDiff[]): void {
   console.log(`  ${c('yellow', `With Differences: ${totalMismatched}`)}`);
   console.log(`  ${c('red', `Missing in HyperIndex: ${totalMissingInHyperindex}`)}`);
   console.log(`  ${c('yellow', `Missing in Subgraph: ${totalMissingInSubgraph}`)}`);
+  if (idMismatchCount > 0) {
+    console.log(`  ${c('red', `Entities with ID Mismatch: ${idMismatchCount}`)}`);
+  }
 
   // Overall status
   const overallOk = totalMissingInHyperindex === 0 &&

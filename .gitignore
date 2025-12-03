@@ -30,5 +30,3 @@ npm-debug.log*
 
 # Generated config (from --generate-config)
 generated-entity-configs.ts
-
-PLANNED_FIXES.md

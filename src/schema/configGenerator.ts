@@ -98,9 +98,11 @@ function generateEntityConfig(
         nestedFields[mapping.subgraphField] = mapping.hyperindexField;
         break;
       case 'renamed':
-        // For renamed fields, we store in fieldMapping and include the hyperindex field name in fields
+        // For renamed fields, store the mapping and use subgraph field name in fields
+        // The subgraph client will use subgraph field names
+        // The hyperindex client will translate using fieldMapping
         fieldMapping[mapping.subgraphField] = mapping.hyperindexField;
-        fields.push(mapping.hyperindexField);
+        fields.push(mapping.subgraphField);
         break;
       case 'type_converted':
         fields.push(mapping.subgraphField);
@@ -129,14 +131,14 @@ function toSubgraphQueryName(entityName: string): string {
   // Handle special cases based on actual subgraph conventions
   const specialCases: Record<string, string> = {
     'NFTLookup': 'nftlookups',
-    'PoolFees': 'poolFees', // Already plural-ish, keep as is
+    'PoolFees': 'poolFees_collection', // Uses _collection suffix for list query
     'Activity': 'activities',
     'TokenDayData': 'tokenDayDatas',
     'TokenHourData': 'tokenHourDatas',
     'TokenMinuteData': 'tokenMinuteDatas',
     'Token15MinuteData': 'token15MinuteDatas',
     'Token4HourData': 'token4HourDatas',
-    'CollectionMetadata': 'collectionMetadatas',
+    'CollectionMetadata': 'collectionMetadata_collection', // Immutable entity uses _collection suffix
     'MemecoinTreasury': 'memecoinTreasuries',
   };
 

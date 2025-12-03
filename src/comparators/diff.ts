@@ -1,4 +1,4 @@
-import { DISCREPANCY_THRESHOLD_PERCENT, type EntityName } from '../config.js';
+import { DISCREPANCY_THRESHOLD_PERCENT } from '../config.js';
 import { getComparableFields } from './normalize.js';
 
 export interface FieldMismatch {
@@ -10,7 +10,7 @@ export interface FieldMismatch {
 }
 
 export interface EntityDiff {
-  entityName: EntityName;
+  entityName: string;
   subgraphCount: number;
   hyperindexCount: number;
   commonIds: string[];
@@ -19,13 +19,17 @@ export interface EntityDiff {
   fieldMismatches: FieldMismatch[];
   matchedCount: number;
   mismatchedCount: number;
+  // ID mismatch detection
+  suspectedIdMismatch?: boolean;
+  sampleSubgraphIds?: string[];
+  sampleHyperindexIds?: string[];
 }
 
 /**
  * Calculate diff between normalized subgraph and hyperindex data
  */
 export function calculateDiff(
-  entityName: EntityName,
+  entityName: string,
   subgraphData: Map<string, Record<string, unknown>>,
   hyperindexData: Map<string, Record<string, unknown>>
 ): EntityDiff {

@@ -54,14 +54,19 @@ export function normalizeHyperIndexResponse(
 ): Map<string, Record<string, unknown>> {
   const config = getConfig(entityName);
   const normalized = new Map<string, Record<string, unknown>>();
+  const fieldMapping = config.fieldMapping || {};
 
   for (const record of records) {
     const id = record.id as string;
     const flat: Record<string, unknown> = {};
 
-    // Copy direct fields
-    for (const field of config.fields) {
-      flat[field] = normalizeValue(record[field]);
+    // Copy direct fields - translate renamed fields
+    // config.fields contains subgraph field names
+    // fieldMapping maps subgraph -> hyperindex for renamed fields
+    for (const subgraphField of config.fields) {
+      const hyperindexField = fieldMapping[subgraphField] || subgraphField;
+      // Store using subgraph field name (for comparison with subgraph data)
+      flat[subgraphField] = normalizeValue(record[hyperindexField]);
     }
 
     // Copy foreign key fields (already flat in HyperIndex)

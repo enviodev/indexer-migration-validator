@@ -1,12 +1,9 @@
 import { writeFileSync } from 'fs';
 import {
-  ENTITY_CONFIGS,
   DEFAULT_SAMPLE_SIZE,
   DEFAULT_BATCH_SIZE,
-  type EntityName,
   getEntityConfigs,
   loadEntityConfigsFromSchemas,
-  useLegacyConfigs,
   SUBGRAPH_SCHEMA_PATH,
   HYPERINDEX_SCHEMA_PATH,
 } from './config.js';
@@ -28,12 +25,11 @@ interface CliArgs {
   skipJson: boolean;
   deep: boolean;
   deepLimit?: number;
-  // New schema-driven options
+  // Schema-driven options
   subgraphSchema?: string;
   hyperindexSchema?: string;
   generateConfigOnly: boolean;
   configOutput?: string;
-  useLegacyConfig: boolean;
 }
 
 /**
@@ -47,8 +43,7 @@ function parseArgs(): CliArgs {
     outputPath: getDefaultOutputPath('./output'),
     skipJson: false,
     deep: false,
-    generateConfigOnly: false,
-    useLegacyConfig: false
+    generateConfigOnly: false
   };
 
   let specifiedEntity: string | null = null;
@@ -87,8 +82,6 @@ function parseArgs(): CliArgs {
     } else if (arg === '--config-output' && args[i + 1]) {
       result.configOutput = args[i + 1];
       i++;
-    } else if (arg === '--use-legacy-config') {
-      result.useLegacyConfig = true;
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -105,12 +98,12 @@ function parseArgs(): CliArgs {
 
 function printHelp(): void {
   console.log(`
-Subgraph vs HyperIndex Comparison Tool
+Indexer Migration Validator - Subgraph vs HyperIndex Comparison Tool
 
 Usage: pnpm compare [options]
 
 Options:
-  --entity <name>           Compare only specified entity (e.g., Pool, CollectionToken)
+  --entity <name>           Compare only specified entity (e.g., Pool, Token)
   --sample <n>              Number of random samples per entity (default: ${DEFAULT_SAMPLE_SIZE})
   --id <id>                 Compare a specific ID across relevant entities
   --output <path>           Output JSON report path
@@ -119,38 +112,45 @@ Options:
   --deep-limit <n>          Deep comparison with max N records per entity
   --help, -h                Show this help
 
-Schema-driven options:
+Schema options:
   --subgraph-schema <path>  Path to subgraph schema file (default: ./subgraph-schema.graphql)
   --hyperindex-schema <path> Path to hyperindex schema file (default: ./hyperindex-schema.graphql)
   --generate-config         Generate entity config from schemas and exit
   --config-output <path>    Output path for generated config (default: ./generated-entity-configs.ts)
-  --use-legacy-config       Use hardcoded legacy entity configs instead of schema-driven
 
 Environment variables:
-  SUBGRAPH_URL              Subgraph GraphQL endpoint
-  HYPERINDEX_URL            HyperIndex GraphQL endpoint
+  SUBGRAPH_URL              Subgraph GraphQL endpoint (required)
+  HYPERINDEX_URL            HyperIndex GraphQL endpoint (required)
   SUBGRAPH_SCHEMA           Path to subgraph schema file
   HYPERINDEX_SCHEMA         Path to hyperindex schema file
   OVERRIDES_PATH            Path to overrides.json file
 
 Examples:
-  pnpm compare                          # Compare all entities (schema-driven)
+  pnpm compare                          # Compare all entities
   pnpm compare --entity Pool            # Compare only Pool entity
   pnpm compare --sample 100             # Use larger sample size
   pnpm compare --deep --entity Pool     # Deep compare ALL Pool records
   pnpm compare --deep-limit 5000        # Deep compare up to 5000 records per entity
   pnpm compare --generate-config        # Generate config from schema files
-  pnpm compare --use-legacy-config      # Use hardcoded Flaunch configs
+
+See examples/ directory for sample configurations.
 `);
+}
+
+interface IdSampleResult {
+  commonIds: string[];
+  subgraphIds: string[];
+  hyperindexIds: string[];
+  suspectedIdMismatch: boolean;
 }
 
 /**
  * Get random sample of IDs from the intersection of both sources
  */
 async function getRandomSampleIds(
-  entityName: EntityName,
+  entityName: string,
   sampleSize: number
-): Promise<string[]> {
+): Promise<IdSampleResult> {
   console.log(`  Fetching IDs from both sources...`);
 
   // Fetch IDs from both sources
@@ -167,56 +167,77 @@ async function getRandomSampleIds(
 
   console.log(`  Common IDs: ${commonIds.length}`);
 
+  // Detect suspected ID format mismatch: both have records but no overlap
+  const suspectedIdMismatch = subgraphIds.length > 0 && hyperindexIds.length > 0 && commonIds.length === 0;
+
   // Random sample
-  if (commonIds.length <= sampleSize) {
-    return commonIds;
+  let sampledCommonIds = commonIds;
+  if (commonIds.length > sampleSize) {
+    // Fisher-Yates shuffle and take first N
+    const shuffled = [...commonIds];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    sampledCommonIds = shuffled.slice(0, sampleSize);
   }
 
-  // Fisher-Yates shuffle and take first N
-  const shuffled = [...commonIds];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  return shuffled.slice(0, sampleSize);
+  return {
+    commonIds: sampledCommonIds,
+    subgraphIds,
+    hyperindexIds,
+    suspectedIdMismatch
+  };
 }
 
 /**
  * Compare a single entity type (sample mode)
  */
-async function compareEntity(entityName: EntityName, sampleSize: number): Promise<EntityDiff> {
+async function compareEntity(entityName: string, sampleSize: number): Promise<EntityDiff> {
   console.log(`\nComparing ${entityName}...`);
 
   // Get random sample of IDs
-  const sampleIds = await getRandomSampleIds(entityName, sampleSize);
+  const idResult = await getRandomSampleIds(entityName, sampleSize);
+  const entityConfigs = getEntityConfigs();
+  const config = entityConfigs[entityName];
 
-  if (sampleIds.length === 0) {
-    const config = ENTITY_CONFIGS[entityName] as any;
-    if (config.knownIdMismatch) {
-      console.log(`  No common IDs - known ID format mismatch (see PLANNED_FIXES.md)`);
+  if (idResult.commonIds.length === 0) {
+    // Check if this is a suspected ID mismatch
+    if (idResult.suspectedIdMismatch) {
+      console.log(`  \x1b[31m⚠ SUSPECTED ID FORMAT MISMATCH!\x1b[0m`);
+      console.log(`  Both sources have records but NO common IDs found.`);
+      console.log(`  Sample Subgraph IDs:`);
+      idResult.subgraphIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+      console.log(`  Sample HyperIndex IDs:`);
+      idResult.hyperindexIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+    } else if (config?.knownIdMismatch) {
+      console.log(`  No common IDs - known ID format mismatch`);
     } else {
       console.log(`  No common IDs found for ${entityName}`);
     }
+
     return {
       entityName,
-      subgraphCount: 0,
-      hyperindexCount: 0,
+      subgraphCount: idResult.subgraphIds.length,
+      hyperindexCount: idResult.hyperindexIds.length,
       commonIds: [],
-      missingInHyperindex: [],
-      missingInSubgraph: [],
+      missingInHyperindex: idResult.subgraphIds,
+      missingInSubgraph: idResult.hyperindexIds,
       fieldMismatches: [],
       matchedCount: 0,
-      mismatchedCount: 0
+      mismatchedCount: 0,
+      suspectedIdMismatch: idResult.suspectedIdMismatch,
+      sampleSubgraphIds: idResult.subgraphIds.slice(0, 5),
+      sampleHyperindexIds: idResult.hyperindexIds.slice(0, 5)
     };
   }
 
-  console.log(`  Fetching ${sampleIds.length} records from both sources...`);
+  console.log(`  Fetching ${idResult.commonIds.length} records from both sources...`);
 
   // Fetch full data for sample IDs
   const [subgraphData, hyperindexData] = await Promise.all([
-    subgraph.fetchByIds(entityName, sampleIds),
-    hyperindex.fetchByIds(entityName, sampleIds)
+    subgraph.fetchByIds(entityName, idResult.commonIds),
+    hyperindex.fetchByIds(entityName, idResult.commonIds)
   ]);
 
   console.log(`  Received: Subgraph=${subgraphData.length}, HyperIndex=${hyperindexData.length}`);
@@ -232,12 +253,13 @@ async function compareEntity(entityName: EntityName, sampleSize: number): Promis
 /**
  * Deep compare a single entity type (fetch ALL records)
  */
-async function deepCompareEntity(entityName: EntityName, limit?: number): Promise<EntityDiff> {
+async function deepCompareEntity(entityName: string, limit?: number): Promise<EntityDiff> {
   console.log(`\n[DEEP] Comparing ${entityName}...`);
 
-  const config = ENTITY_CONFIGS[entityName] as any;
-  if (config.knownIdMismatch) {
-    console.log(`  Skipping - known ID format mismatch (see PLANNED_FIXES.md)`);
+  const entityConfigs = getEntityConfigs();
+  const config = entityConfigs[entityName];
+  if (config?.knownIdMismatch) {
+    console.log(`  Skipping - known ID format mismatch (configure in overrides.json)`);
     return {
       entityName,
       subgraphCount: 0,
@@ -381,29 +403,27 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Load entity configs
+  // Load entity configs from schema files
   let entityConfigs: Record<string, any>;
 
-  if (args.useLegacyConfig) {
-    console.log('Using legacy hardcoded entity configs');
-    useLegacyConfigs();
-    entityConfigs = getEntityConfigs();
-  } else {
-    // Try to load from schema files
-    try {
-      entityConfigs = await loadEntityConfigsFromSchemas(
-        args.subgraphSchema,
-        args.hyperindexSchema,
-        undefined,
-        true // verbose
-      );
-      console.log(`\nLoaded ${Object.keys(entityConfigs).length} entity configs from schemas`);
-    } catch (error) {
-      console.log(`\nSchema files not found, using legacy configs`);
-      console.log(`(Use --subgraph-schema and --hyperindex-schema to specify schema files)`);
-      useLegacyConfigs();
-      entityConfigs = getEntityConfigs();
-    }
+  try {
+    entityConfigs = await loadEntityConfigsFromSchemas(
+      args.subgraphSchema,
+      args.hyperindexSchema,
+      undefined,
+      true // verbose
+    );
+    console.log(`\nLoaded ${Object.keys(entityConfigs).length} entity configs from schemas`);
+  } catch (error) {
+    console.error('\nError: Could not load schema files.');
+    console.error('Please provide schema files using:');
+    console.error('  --subgraph-schema <path>   Path to subgraph GraphQL schema');
+    console.error('  --hyperindex-schema <path> Path to HyperIndex GraphQL schema');
+    console.error('\nOr set environment variables:');
+    console.error('  SUBGRAPH_SCHEMA=./path/to/subgraph-schema.graphql');
+    console.error('  HYPERINDEX_SCHEMA=./path/to/hyperindex-schema.graphql');
+    console.error('\nSee examples/ directory for sample configurations.');
+    process.exit(1);
   }
 
   // Validate and set entities to compare
@@ -434,8 +454,8 @@ async function main(): Promise<void> {
   for (const entityName of args.entities) {
     try {
       const diff = args.deep
-        ? await deepCompareEntity(entityName as EntityName, args.deepLimit)
-        : await compareEntity(entityName as EntityName, args.sampleSize);
+        ? await deepCompareEntity(entityName, args.deepLimit)
+        : await compareEntity(entityName, args.sampleSize);
       diffs.push(diff);
       printEntityDiff(diff);
     } catch (error) {
