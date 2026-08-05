@@ -1,0 +1,37 @@
+# GENERATED from the live HyperIndex endpoint by `pnpm introspect`.
+# Do not hand-edit — regenerate instead.
+#
+# Relations are FLATTENED to their `<name>_id` scalar column, which is what the
+# API actually serves and what the matcher maps subgraph relations onto.
+# Object/list relationship fields are omitted: they are Hasura navigation, not
+# stored columns.
+
+type Deposit {
+  eternalFarming: String
+  id: String!
+  liquidity: numeric!
+  owner: String!
+  pool: String!
+}
+
+type EternalFarming {
+  bonusReward: numeric!
+  bonusRewardRate: numeric!
+  bonusRewardToken: String!
+  id: String!
+  isDeactivated: Boolean
+  minRangeLength: numeric!
+  nonce: numeric!
+  pool: String!
+  reward: numeric!
+  rewardRate: numeric!
+  rewardToken: String!
+  virtualPool: String!
+}
+
+type Reward {
+  amount: numeric!
+  id: String!
+  owner: String!
+  rewardAddress: String!
+}

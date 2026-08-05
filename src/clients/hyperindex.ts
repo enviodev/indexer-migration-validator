@@ -1,7 +1,11 @@
 import { GraphQLClient } from 'graphql-request';
 import { HYPERINDEX_URL, getEntityConfigs } from '../config.js';
+import { chainPrefix, stripChainPrefix } from '../runtime.js';
+import { requestWithRetry } from './request.js';
 
 const client = new GraphQLClient(HYPERINDEX_URL);
+
+const PAGE_SIZE = 1000;
 
 /**
  * Get config for an entity
@@ -16,13 +20,33 @@ function getConfig(entityName: string) {
 }
 
 /**
- * Build a HyperIndex query for fetching entity IDs
+ * Hasura `where` clause restricting results to one chain and/or a keyset cursor.
+ *
+ * A multichain Envio indexer prefixes every entity ID with `${chainId}-`, so
+ * `id: {_like: "1776-%"}` is what isolates the slice that corresponds to a
+ * single-chain subgraph. Without it, the other chains' rows show up as
+ * "missing in subgraph" and swamp the real signal.
  */
-function buildIdQuery(entityName: string, limit: number, offset: number): string {
+function whereClause(after: string | null): string {
+  const prefix = chainPrefix();
+  const clauses: string[] = [];
+  if (prefix !== undefined) clauses.push(`_like: "${prefix}%"`);
+  if (after !== null) clauses.push(`_gt: ${JSON.stringify(after)}`);
+  if (clauses.length === 0) return '';
+  return `where: {id: {${clauses.join(', ')}}}, `;
+}
+
+/**
+ * Keyset page of entity IDs.
+ *
+ * Offset pagination previously stopped dead at `offset > 100000`, quietly
+ * truncating large entities. Seeking on `id _gt` removes that ceiling.
+ */
+function buildIdQuery(entityName: string, after: string | null): string {
   const config = getConfig(entityName);
   return `
     query {
-      ${config.hyperindexName}(limit: ${limit}, offset: ${offset}, order_by: {id: asc}) {
+      ${config.hyperindexName}(${whereClause(after)}limit: ${PAGE_SIZE}, order_by: {id: asc}) {
         id
       }
     }
@@ -56,21 +80,49 @@ function buildDataQuery(entityName: string, ids: string[]): string {
   `;
 }
 
-/**
- * Fetch entity IDs from HyperIndex
- */
-export async function fetchIds(entityName: string, limit: number, offset: number = 0): Promise<string[]> {
-  const query = buildIdQuery(entityName, limit, offset);
+async function fetchIdPage(entityName: string, after: string | null): Promise<string[]> {
   const config = getConfig(entityName);
+  const query = buildIdQuery(entityName, after);
+  const result = await requestWithRetry<Record<string, Array<{ id: string }>>>(
+    client,
+    query,
+    `[HyperIndex] ${entityName} ids`,
+  );
+  return result[config.hyperindexName]?.map(item => item.id) ?? [];
+}
 
-  try {
-    const result = await client.request<Record<string, Array<{ id: string }>>>(query);
-    return result[config.hyperindexName]?.map(item => item.id) ?? [];
-  } catch (error: any) {
-    const msg = error?.response?.errors?.[0]?.message || error?.message || 'Unknown error';
-    console.error(`[HyperIndex] Error fetching ${entityName} IDs: ${msg}`);
-    return [];
+/**
+ * Re-apply the chain prefix to IDs that were stripped for comparison.
+ *
+ * IDs leave this module bare so they can be set-compared against the
+ * single-chain subgraph, but the database still keys them prefixed — so any
+ * lookup BY id has to put the prefix back.
+ */
+function toStoredId(id: string): string {
+  const prefix = chainPrefix();
+  if (prefix === undefined || id.startsWith(prefix)) return id;
+  return `${prefix}${id}`;
+}
+
+/**
+ * Fetch up to `limit` entity IDs (sampling path).
+ *
+ * Note the cursor pages on the RAW (prefixed) id — that is what Postgres
+ * orders by — while the returned array is stripped for comparison.
+ */
+export async function fetchIds(entityName: string, limit: number): Promise<string[]> {
+  const ids: string[] = [];
+  let after: string | null = null;
+
+  while (ids.length < limit) {
+    const page: string[] = await fetchIdPage(entityName, after);
+    if (page.length === 0) break;
+    ids.push(...page);
+    after = page[page.length - 1]!;
+    if (page.length < PAGE_SIZE) break;
   }
+
+  return ids.slice(0, limit).map(stripChainPrefix);
 }
 
 /**
@@ -79,81 +131,46 @@ export async function fetchIds(entityName: string, limit: number, offset: number
 export async function fetchByIds(entityName: string, ids: string[]): Promise<Record<string, unknown>[]> {
   if (ids.length === 0) return [];
 
-  const query = buildDataQuery(entityName, ids);
   const config = getConfig(entityName);
-
-  try {
-    const result = await client.request<Record<string, Record<string, unknown>[]>>(query);
-    return result[config.hyperindexName] ?? [];
-  } catch (error: any) {
-    const msg = error?.response?.errors?.[0]?.message || error?.message || 'Unknown error';
-    console.error(`[HyperIndex] Error fetching ${entityName} data: ${msg}`);
-    return [];
-  }
+  const query = buildDataQuery(entityName, ids.map(toStoredId));
+  const result = await requestWithRetry<Record<string, Record<string, unknown>[]>>(
+    client,
+    query,
+    `[HyperIndex] ${entityName} data`,
+  );
+  return result[config.hyperindexName] ?? [];
 }
 
 /**
- * Get total count for an entity using aggregate query
+ * Total row count.
+ *
+ * Aggregates are DISABLED on these deployments (`X_aggregate` fails validation),
+ * so this always paginates. No cap.
  */
 export async function fetchCount(entityName: string): Promise<number> {
-  const config = getConfig(entityName);
-  const query = `
-    query {
-      ${config.hyperindexName}_aggregate {
-        aggregate {
-          count
-        }
-      }
-    }
-  `;
-
-  try {
-    const result = await client.request<Record<string, { aggregate: { count: number } }>>(query);
-    return result[`${config.hyperindexName}_aggregate`]?.aggregate?.count ?? 0;
-  } catch (error) {
-    // Fallback to manual counting if aggregate not available
-    console.warn(`[HyperIndex] Aggregate query failed for ${entityName}, using manual count`);
-    let total = 0;
-    let offset = 0;
-    const batchSize = 1000;
-
-    while (true) {
-      const ids = await fetchIds(entityName, batchSize, offset);
-      total += ids.length;
-      if (ids.length < batchSize) break;
-      offset += batchSize;
-      if (offset > 100000) break;
-    }
-
-    return total;
-  }
+  return (await fetchAllIds(entityName)).length;
 }
 
 /**
- * Fetch ALL entity IDs using pagination
+ * Fetch ALL entity IDs using keyset pagination. No 100k ceiling.
  */
 export async function fetchAllIds(entityName: string, onProgress?: (count: number) => void): Promise<string[]> {
   const allIds: string[] = [];
-  let offset = 0;
-  const batchSize = 1000;
+  let after: string | null = null;
 
   while (true) {
-    const ids = await fetchIds(entityName, batchSize, offset);
-    allIds.push(...ids);
+    const page: string[] = await fetchIdPage(entityName, after);
+    allIds.push(...page);
 
     if (onProgress) onProgress(allIds.length);
 
-    if (ids.length < batchSize) break;
-    offset += batchSize;
-
-    // Safety limit - 100k records max
-    if (offset > 100000) {
-      console.warn(`[HyperIndex] Hit 100k limit for ${entityName}`);
-      break;
-    }
+    if (page.length < PAGE_SIZE) break;
+    after = page[page.length - 1]!;
   }
 
-  return allIds;
+  // Stripped for comparison against the single-chain subgraph; fetchByIds puts
+  // the prefix back when it looks rows up again.
+  return allIds.map(stripChainPrefix);
 }
 
 /**
@@ -165,7 +182,10 @@ export async function fetchAllByIds(
   onProgress?: (fetched: number, total: number) => void
 ): Promise<Record<string, unknown>[]> {
   const allData: Record<string, unknown>[] = [];
-  const batchSize = 100; // Smaller batch for full data queries
+  // 500 keeps us under the subgraph's `first: 1000` ceiling while issuing 5x
+  // fewer requests than the old 100 — materially less rate-limit pressure on
+  // a 170k-row table.
+  const batchSize = 500;
 
   for (let i = 0; i < ids.length; i += batchSize) {
     const batchIds = ids.slice(i, i + batchSize);

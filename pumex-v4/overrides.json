@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "pumex-v4-envio chain 1776 (Injective) vs Ormi pumex-v4cl-main/v1.0.1.",
+    "MULTICHAIN indexer: run with --chain 1776 so IDs are prefix-filtered/stripped.",
+    "Swap/ModifyLiquidity are idMatchConfirmed: the detectIdMismatch name",
+    "heuristic would otherwise SILENTLY SKIP them in --deep and report 0/0,",
+    "which reads like a pass."
+  ],
+  "fieldMappings": {},
+  "knownIdMismatch": [],
+  "idMatchConfirmed": ["Swap", "ModifyLiquidity", "ModifyLiquidityCache"],
+  "skipFields": {},
+  "skipEntities": []
+}

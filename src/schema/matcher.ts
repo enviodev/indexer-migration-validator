@@ -43,9 +43,15 @@ export function matchSchemas(
     if (hiEntity) {
       matchedHyperindexNames.add(hiEntity.name);
       const entityOverrides = overrides?.fieldMappings?.[name] || {};
-      const fieldMappings = matchFields(sgEntity, hiEntity, entityOverrides);
+      // Fields the caller has explicitly excluded (overrides.skipFields).
+      // Needed when a field cannot be SELECTED from one side at all — e.g. a
+      // subgraph relation declared non-null whose target row is missing, which
+      // makes the whole GraphQL response error and silently yield zero records.
+      const entitySkipFields = overrides?.skipFields?.[name] || [];
+      const fieldMappings = matchFields(sgEntity, hiEntity, entityOverrides, entitySkipFields);
 
-      const sgComparableFields = getComparableFields(sgEntity);
+      const skip = new Set(entitySkipFields);
+      const sgComparableFields = getComparableFields(sgEntity).filter(f => !skip.has(f.name));
       const hiComparableFields = getComparableFields(hiEntity);
 
       // Find unmapped fields
@@ -88,14 +94,20 @@ export function matchSchemas(
 function matchFields(
   sgEntity: ParsedEntity,
   hiEntity: ParsedEntity,
-  overrides: Record<string, string>
+  overrides: Record<string, string>,
+  skipFields: string[] = []
 ): FieldMapping[] {
   const mappings: FieldMapping[] = [];
   const hiFieldMap = new Map(hiEntity.fields.map(f => [f.name, f]));
   const hiFieldMapLower = new Map(hiEntity.fields.map(f => [f.name.toLowerCase(), f]));
   const usedHiFields = new Set<string>();
 
-  const sgComparableFields = getComparableFields(sgEntity);
+  // Fields the caller has explicitly excluded (overrides.skipFields). Needed
+  // when a field cannot be SELECTED from one side at all — e.g. a subgraph
+  // relation declared non-null whose target row is missing, which makes the
+  // whole GraphQL response error out and silently yields zero records.
+  const skip = new Set(skipFields);
+  const sgComparableFields = getComparableFields(sgEntity).filter(f => !skip.has(f.name));
 
   for (const sgField of sgComparableFields) {
     // 1. Check overrides first

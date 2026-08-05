@@ -1,13 +1,16 @@
 import 'dotenv/config';
-import { writeFileSync } from 'fs';
+import { writeFileSync, createWriteStream } from 'fs';
+import { basename, dirname, extname, join } from 'path';
 import {
   DEFAULT_SAMPLE_SIZE,
   DEFAULT_BATCH_SIZE,
   getEntityConfigs,
   loadEntityConfigsFromSchemas,
   SUBGRAPH_SCHEMA_PATH,
+  OVERRIDES_PATH,
   HYPERINDEX_SCHEMA_PATH,
 } from './config.js';
+import { setRuntimeOptions } from './runtime.js';
 import * as subgraph from './clients/subgraph.js';
 import * as hyperindex from './clients/hyperindex.js';
 import { normalizeSubgraphResponse, normalizeHyperIndexResponse } from './comparators/normalize.js';
@@ -17,6 +20,19 @@ import { generateReport, saveReport, getDefaultOutputPath } from './reporters/js
 import { parseSchemaFile } from './schema/parser.js';
 import { generateConfigs, generateTypeScriptConfig, loadOverrides } from './schema/configGenerator.js';
 import { getMatchSummary, matchSchemas } from './schema/matcher.js';
+
+function getSummaryOutputPath(jsonOutputPath: string): string {
+  const dir = dirname(jsonOutputPath);
+  const base = basename(jsonOutputPath);
+  const ext = extname(base);
+  const baseNoExt = ext ? base.slice(0, -ext.length) : base;
+
+  if (base.startsWith('comparison-')) {
+    return join(dir, `summary-${baseNoExt}.md`);
+  }
+
+  return join(dir, `summary-${baseNoExt}.md`);
+}
 
 interface CliArgs {
   entities: string[];
@@ -31,6 +47,14 @@ interface CliArgs {
   hyperindexSchema?: string;
   generateConfigOnly: boolean;
   configOutput?: string;
+  /** Compare only this chain's slice of a multichain HyperIndex deployment. */
+  chainId?: number;
+  /** Pin the subgraph read to this block (The Graph time-travel). */
+  endBlock?: number;
+  /** Attempts per request before aborting the run. */
+  retries?: number;
+  /** Minimum ms between consecutive requests, to stay under rate limits. */
+  throttleMs?: number;
 }
 
 /**
@@ -78,6 +102,18 @@ function parseArgs(): CliArgs {
     } else if (arg === '--hyperindex-schema' && args[i + 1]) {
       result.hyperindexSchema = args[i + 1];
       i++;
+    } else if (arg === '--chain' && args[i + 1]) {
+      result.chainId = parseInt(args[i + 1], 10);
+      i++;
+    } else if (arg === '--end-block' && args[i + 1]) {
+      result.endBlock = parseInt(args[i + 1], 10);
+      i++;
+    } else if (arg === '--retries' && args[i + 1]) {
+      result.retries = parseInt(args[i + 1], 10);
+      i++;
+    } else if (arg === '--throttle-ms' && args[i + 1]) {
+      result.throttleMs = parseInt(args[i + 1], 10);
+      i++;
     } else if (arg === '--generate-config') {
       result.generateConfigOnly = true;
     } else if (arg === '--config-output' && args[i + 1]) {
@@ -93,6 +129,14 @@ function parseArgs(): CliArgs {
   if (specifiedEntity) {
     result.entities = [specifiedEntity];
   }
+
+  // Publish run-scoped options before any client is used.
+  setRuntimeOptions({
+    chainId: result.chainId,
+    endBlock: result.endBlock,
+    ...(result.retries !== undefined ? { retries: result.retries } : {}),
+    ...(result.throttleMs !== undefined ? { throttleMs: result.throttleMs } : {}),
+  });
 
   return result;
 }
@@ -112,6 +156,31 @@ Options:
   --deep                    Deep comparison: fetch ALL records (uses pagination)
   --deep-limit <n>          Deep comparison with max N records per entity
   --help, -h                Show this help
+
+Multichain / fair-comparison options:
+  --chain <id>              Compare only this chain's slice of a MULTICHAIN
+                            HyperIndex deployment. Envio prefixes entity IDs
+                            with '<chainId>-' when the indexer is multichain but
+                            the subgraph was not. This filters HyperIndex to
+                            'id _like "<id>-%"' and strips the prefix from 'id'
+                            and every '*_id' foreign key before diffing.
+                            Omit for single-chain indexers with bare IDs.
+  --end-block <n>           Pin the SUBGRAPH read to this block via The Graph's
+                            time-travel argument. Set it to the Envio side's
+                            'latest_processed_block' (it trails head by ~200
+                            blocks for reorg safety). WITHOUT THIS, every
+                            mutable accumulator (Factory.txCount, DayData, ...)
+                            drifts between the two heads and reports as a false
+                            mismatch.
+  --retries <n>             Attempts per request before aborting (default: 5).
+                            Requests are retried with exponential backoff and
+                            then THROW — a failed fetch is never reported as
+                            "zero rows", which would look like missing entities.
+  --throttle-ms <n>         Minimum ms between requests. Hosted HyperIndex
+                            endpoints return 429 under sustained paging; pacing
+                            avoids tripping the limit at all. 429/503 also get
+                            their own larger retry budget with long backoff,
+                            honouring Retry-After.
 
 Schema options:
   --subgraph-schema <path>  Path to subgraph schema file (default: ./subgraph-schema.graphql)
@@ -134,6 +203,14 @@ Examples:
   pnpm compare --deep-limit 5000        # Deep compare up to 5000 records per entity
   pnpm compare --generate-config        # Generate config from schema files
 
+Multichain examples:
+  # One chain of a multichain indexer vs its single-chain subgraph, both pinned
+  # to the same height:
+  pnpm compare --deep --chain 1776 --end-block 177318747
+
+  # Single-chain indexer (bare IDs) — no --chain needed:
+  pnpm compare --deep --end-block 23756547
+
 See examples/ directory for sample configurations.
 `);
 }
@@ -143,6 +220,27 @@ interface IdSampleResult {
   subgraphIds: string[];
   hyperindexIds: string[];
   suspectedIdMismatch: boolean;
+}
+
+/**
+ * Convert Bytes ID to hex string if it's binary data for display
+ */
+function formatIdForDisplay(id: string): string {
+  // Already hex string
+  if (typeof id === 'string' && id.startsWith('0x')) {
+    return id;
+  }
+  // Check if it looks like binary data (non-printable chars)
+  if (typeof id === 'string' && /[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(id)) {
+    // Convert binary string to hex
+    let hex = '0x';
+    for (let i = 0; i < id.length; i++) {
+      const charCode = id.charCodeAt(i);
+      hex += charCode.toString(16).padStart(2, '0');
+    }
+    return hex;
+  }
+  return id;
 }
 
 /**
@@ -208,9 +306,15 @@ async function compareEntity(entityName: string, sampleSize: number): Promise<En
       console.log(`  \x1b[31m⚠ SUSPECTED ID FORMAT MISMATCH!\x1b[0m`);
       console.log(`  Both sources have records but NO common IDs found.`);
       console.log(`  Sample Subgraph IDs:`);
-      idResult.subgraphIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+      idResult.subgraphIds.slice(0, 3).forEach(id => {
+        const displayId = formatIdForDisplay(id);
+        console.log(`    - ${displayId}`);
+      });
       console.log(`  Sample HyperIndex IDs:`);
-      idResult.hyperindexIds.slice(0, 3).forEach(id => console.log(`    - ${id}`));
+      idResult.hyperindexIds.slice(0, 3).forEach(id => {
+        const displayId = formatIdForDisplay(id);
+        console.log(`    - ${displayId}`);
+      });
     } else if (config?.knownIdMismatch) {
       console.log(`  No common IDs - known ID format mismatch`);
     } else {
@@ -311,11 +415,16 @@ async function deepCompareEntity(entityName: string, limit?: number): Promise<En
     };
   }
 
-  // Apply limit if specified
+  // Apply limit if specified, or default cap for deep mode
   let idsToCompare = commonIds;
-  if (limit && commonIds.length > limit) {
-    console.log(`  Limiting to ${limit} records (of ${commonIds.length} common)`);
-    idsToCompare = commonIds.slice(0, limit);
+  // NO implicit cap. This used to default to 10000, which silently truncated
+  // every entity larger than that and reported the run as complete — a
+  // "deep, no caps" comparison that quietly skipped 140k of 171k Transactions.
+  // A cap now only exists if the caller passed --deep-limit explicitly.
+  const effectiveLimit = limit;
+  if (effectiveLimit && commonIds.length > effectiveLimit) {
+    console.log(`  Limiting to ${effectiveLimit} records (of ${commonIds.length} common)`);
+    idsToCompare = commonIds.slice(0, effectiveLimit);
   }
 
   // Fetch full data for all common IDs with progress
@@ -365,8 +474,12 @@ async function generateConfigCommand(args: CliArgs): Promise<void> {
   console.log(`\nSubgraph: ${subgraphSchema.entities.size} entities, ${subgraphSchema.enums.size} enums`);
   console.log(`HyperIndex: ${hyperindexSchema.entities.size} entities`);
 
-  // Load overrides if available
-  const overrides = loadOverrides('./overrides.json');
+  // Load overrides if available.
+  // Must honour OVERRIDES_PATH: hardcoding './overrides.json' made
+  // --generate-config read a different file from the one `compare` actually
+  // uses, so the preview it printed did not reflect the real run.
+  console.log(`Overrides: ${OVERRIDES_PATH}`);
+  const overrides = loadOverrides(OVERRIDES_PATH);
 
   const result = generateConfigs(subgraphSchema, hyperindexSchema, overrides);
 
@@ -450,27 +563,151 @@ async function main(): Promise<void> {
     console.log(`Mode: Sample (${args.sampleSize} per entity)`);
   }
 
-  const diffs: EntityDiff[] = [];
+  // Tee all output to a summary file next to the JSON report path.
+  // This captures the exact console output (including progress logs) in a file.
+  const summaryPath = getSummaryOutputPath(args.outputPath);
+  const summaryStream = createWriteStream(summaryPath, { encoding: 'utf-8' });
+  summaryStream.write(`# Comparison summary output\n\n`);
+  summaryStream.write(`This file captures the terminal output from this run.\n\n`);
+  summaryStream.write('```text\n');
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
 
-  for (const entityName of args.entities) {
-    try {
-      const diff = args.deep
-        ? await deepCompareEntity(entityName, args.deepLimit)
-        : await compareEntity(entityName, args.sampleSize);
-      diffs.push(diff);
-      printEntityDiff(diff);
-    } catch (error) {
-      console.error(`\nError comparing ${entityName}:`, error);
+  const ansiRegex = /\x1b\[[0-9;]*m/g;
+  let pendingLine = '';
+
+  function shouldKeepSummaryLine(line: string): boolean {
+    const t = line.trim();
+    if (t === '') return true;
+
+    // Keep the actual comparison outputs and structured sections.
+    if (t.startsWith('=== ') || t.startsWith('========== ')) return true;
+    if (t === 'Entity Status:' || t === 'Totals:') return true;
+    if (t.startsWith('Field mismatch')) return true;
+    if (t.startsWith('Records:') || t.startsWith('Compared:')) return true;
+    if (t.startsWith('Missing in HyperIndex:') || t.startsWith('Missing in Subgraph:')) return true;
+    if (t.startsWith('Status:')) return true;
+    if (t.startsWith('Overall:')) return true;
+    if (/^\[(OK|WARN|ERR)\]\s+/.test(t)) return true; // entity status list items
+
+    // Keep mismatch details (IDs and field/value lines)
+    if (/^0x[0-9a-fA-F]{6,}/.test(t)) return true;
+    if (/^\d/.test(t) && t.includes(':')) return true; // e.g. 100#101574139:
+    if (/^e\.g\.\s+/.test(t)) return true;
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*:\s+/.test(t)) return true; // field: "a" vs "b"
+
+    // Drop operational/logging/progress lines.
+    const noisyPrefixes = [
+      'Loaded overrides from:',
+      'Parsing subgraph schema:',
+      'Parsing hyperindex schema:',
+      'Subgraph:',
+      'HyperIndex:',
+      'Generated ',
+      'Warnings:',
+      'Loaded ',
+      'Subgraph vs HyperIndex Comparison',
+      'Entities:',
+      'Mode:',
+      '[DEEP] Comparing',
+      '[DEEP]',
+      'Comparing ',
+      'Fetching ',
+      'etching ',
+      'Received:',
+      'Subgraph has ',
+      'HyperIndex has ',
+      'Common IDs:',
+      'Common:',
+      'Limiting to ',
+      'Report saved to:',
+      'Summary output saved to:',
+    ];
+    for (const p of noisyPrefixes) {
+      if (t.startsWith(p)) return false;
+    }
+
+    // Default: keep (better to be conservative about dropping important lines).
+    return true;
+  }
+
+  function writeToSummaryFile(chunk: unknown): void {
+    const raw = Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : String(chunk);
+    const text = raw.replace(ansiRegex, '');
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (ch === '\r') {
+        // Progress update: overwrite current line (don’t emit anything yet)
+        pendingLine = '';
+        continue;
+      }
+
+      if (ch === '\n') {
+        // Only write completed lines. This collapses progress spam into a single final line.
+        if (shouldKeepSummaryLine(pendingLine)) {
+          summaryStream.write(pendingLine + '\n');
+        }
+        pendingLine = '';
+        continue;
+      }
+
+      pendingLine += ch;
     }
   }
 
-  // Print summary
-  printSummary(diffs);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (process.stdout as any).write = (chunk: unknown, ...rest: unknown[]) => {
+    writeToSummaryFile(chunk);
+    // @ts-expect-error passthrough to node stdout
+    return originalStdoutWrite(chunk, ...(rest as any));
+  };
 
-  // Generate JSON report
-  if (!args.skipJson) {
-    const report = generateReport(diffs);
-    saveReport(report, args.outputPath);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (process.stderr as any).write = (chunk: unknown, ...rest: unknown[]) => {
+    writeToSummaryFile(chunk);
+    // @ts-expect-error passthrough to node stderr
+    return originalStderrWrite(chunk, ...(rest as any));
+  };
+
+  const diffs: EntityDiff[] = [];
+
+  try {
+    for (const entityName of args.entities) {
+      try {
+        const diff = args.deep
+          ? await deepCompareEntity(entityName, args.deepLimit)
+          : await compareEntity(entityName, args.sampleSize);
+        diffs.push(diff);
+        printEntityDiff(diff);
+      } catch (error) {
+        console.error(`\nError comparing ${entityName}:`, error);
+      }
+    }
+
+    // Print summary
+    printSummary(diffs);
+
+    // Generate JSON report
+    if (!args.skipJson) {
+      const report = generateReport(diffs);
+      saveReport(report, args.outputPath);
+    }
+
+    console.log(`\nSummary output saved to: ${summaryPath}`);
+  } finally {
+    // Restore streams even if the compare fails midway
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdout as any).write = originalStdoutWrite;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr as any).write = originalStderrWrite;
+    if (pendingLine.length > 0) {
+      summaryStream.write(pendingLine + '\n');
+      pendingLine = '';
+    }
+    summaryStream.write('\n```\n');
+    summaryStream.end();
   }
 }
 

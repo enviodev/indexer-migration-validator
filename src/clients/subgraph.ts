@@ -1,7 +1,12 @@
-import { GraphQLClient, gql } from 'graphql-request';
+import { GraphQLClient } from 'graphql-request';
 import { SUBGRAPH_URL, getEntityConfigs } from '../config.js';
+import { getRuntimeOptions } from '../runtime.js';
+import { requestWithRetry } from './request.js';
 
 const client = new GraphQLClient(SUBGRAPH_URL);
+
+/** graph-node caps `first` at 1000 on every host we target. */
+const PAGE_SIZE = 1000;
 
 /**
  * Get config for an entity
@@ -16,13 +21,30 @@ function getConfig(entityName: string) {
 }
 
 /**
- * Build a subgraph query for fetching entity IDs
+ * The Graph's time-travel argument, pinning the read to a block.
+ *
+ * Both sides must describe the same height or every mutable accumulator drifts.
+ * Emitted as a query argument fragment, e.g. `, block: { number: 12345 }`.
  */
-function buildIdQuery(entityName: string, limit: number, skip: number): string {
+function blockArg(): string {
+  const { endBlock } = getRuntimeOptions();
+  return endBlock === undefined ? '' : `, block: { number: ${endBlock} }`;
+}
+
+/**
+ * Keyset page of entity IDs, ordered by id.
+ *
+ * Deliberately NOT offset-based: the previous implementation paged with `skip`
+ * and hard-stopped at 100k, silently truncating any larger entity (cl-analytics
+ * Swap alone is ~225k rows) and reporting the remainder as missing. Seeking on
+ * `id_gt` has no ceiling and stays correct however large the table grows.
+ */
+function buildIdQuery(entityName: string, after: string | null): string {
   const config = getConfig(entityName);
+  const where = after === null ? '' : `, where: { id_gt: "${after}" }`;
   return `
     query {
-      ${config.subgraphName}(first: ${limit}, skip: ${skip}, orderBy: id, orderDirection: asc) {
+      ${config.subgraphName}(first: ${PAGE_SIZE}, orderBy: id, orderDirection: asc${where}${blockArg()}) {
         id
       }
     }
@@ -44,7 +66,7 @@ function buildDataQuery(entityName: string, ids: string[]): string {
 
   return `
     query {
-      ${config.subgraphName}(where: { id_in: [${idsString}] }, first: ${ids.length}) {
+      ${config.subgraphName}(where: { id_in: [${idsString}] }, first: ${ids.length}${blockArg()}) {
         ${fields.join('\n        ')}
       }
     }
@@ -52,20 +74,42 @@ function buildDataQuery(entityName: string, ids: string[]): string {
 }
 
 /**
- * Fetch entity IDs from subgraph
+ * Fetch one keyset page of IDs. Throws rather than returning [] on failure.
  */
-export async function fetchIds(entityName: string, limit: number, skip: number = 0): Promise<string[]> {
-  const query = buildIdQuery(entityName, limit, skip);
+async function fetchIdPage(entityName: string, after: string | null): Promise<string[]> {
   const config = getConfig(entityName);
-
-  try {
-    const result = await client.request<Record<string, Array<{ id: string }>>>(query);
-    return result[config.subgraphName]?.map(item => item.id) ?? [];
-  } catch (error: any) {
-    const msg = error?.response?.errors?.[0]?.message || error?.message || 'Unknown error';
-    console.error(`[Subgraph] Error fetching ${entityName} IDs: ${msg}`);
-    return [];
+  const query = buildIdQuery(entityName, after);
+  const result = await requestWithRetry<Record<string, Array<{ id: string }>>>(
+    client,
+    query,
+    `[Subgraph] ${entityName} ids`,
+  );
+  const records = result[config.subgraphName];
+  if (!records) {
+    throw new Error(
+      `[Subgraph] No "${config.subgraphName}" key in response for ${entityName}. ` +
+        `Check the entity's query name.`,
+    );
   }
+  return records.map(item => item.id);
+}
+
+/**
+ * Fetch up to `limit` entity IDs (sampling path).
+ */
+export async function fetchIds(entityName: string, limit: number): Promise<string[]> {
+  const ids: string[] = [];
+  let after: string | null = null;
+
+  while (ids.length < limit) {
+    const page: string[] = await fetchIdPage(entityName, after);
+    if (page.length === 0) break;
+    ids.push(...page);
+    after = page[page.length - 1]!;
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  return ids.slice(0, limit);
 }
 
 /**
@@ -74,61 +118,38 @@ export async function fetchIds(entityName: string, limit: number, skip: number =
 export async function fetchByIds(entityName: string, ids: string[]): Promise<Record<string, unknown>[]> {
   if (ids.length === 0) return [];
 
-  const query = buildDataQuery(entityName, ids);
   const config = getConfig(entityName);
-
-  try {
-    const result = await client.request<Record<string, Record<string, unknown>[]>>(query);
-    return result[config.subgraphName] ?? [];
-  } catch (error: any) {
-    const msg = error?.response?.errors?.[0]?.message || error?.message || 'Unknown error';
-    console.error(`[Subgraph] Error fetching ${entityName} data: ${msg}`);
-    return [];
-  }
+  const query = buildDataQuery(entityName, ids);
+  const result = await requestWithRetry<Record<string, Record<string, unknown>[]>>(
+    client,
+    query,
+    `[Subgraph] ${entityName} data`,
+  );
+  return result[config.subgraphName] ?? [];
 }
 
 /**
- * Get total count for an entity (approximate via fetching all IDs)
+ * Total row count. No cap — pages until the table is exhausted.
  */
 export async function fetchCount(entityName: string): Promise<number> {
-  let total = 0;
-  let skip = 0;
-  const batchSize = 1000;
-
-  while (true) {
-    const ids = await fetchIds(entityName, batchSize, skip);
-    total += ids.length;
-    if (ids.length < batchSize) break;
-    skip += batchSize;
-    // Safety limit
-    if (skip > 100000) break;
-  }
-
-  return total;
+  return (await fetchAllIds(entityName)).length;
 }
 
 /**
- * Fetch ALL entity IDs using pagination
+ * Fetch ALL entity IDs using keyset pagination. No 100k ceiling.
  */
 export async function fetchAllIds(entityName: string, onProgress?: (count: number) => void): Promise<string[]> {
   const allIds: string[] = [];
-  let skip = 0;
-  const batchSize = 1000;
+  let after: string | null = null;
 
   while (true) {
-    const ids = await fetchIds(entityName, batchSize, skip);
-    allIds.push(...ids);
+    const page: string[] = await fetchIdPage(entityName, after);
+    allIds.push(...page);
 
     if (onProgress) onProgress(allIds.length);
 
-    if (ids.length < batchSize) break;
-    skip += batchSize;
-
-    // Safety limit - 100k records max
-    if (skip > 100000) {
-      console.warn(`[Subgraph] Hit 100k limit for ${entityName}`);
-      break;
-    }
+    if (page.length < PAGE_SIZE) break;
+    after = page[page.length - 1]!;
   }
 
   return allIds;
@@ -143,7 +164,10 @@ export async function fetchAllByIds(
   onProgress?: (fetched: number, total: number) => void
 ): Promise<Record<string, unknown>[]> {
   const allData: Record<string, unknown>[] = [];
-  const batchSize = 100; // Smaller batch for full data queries
+  // 500 keeps us under the subgraph's `first: 1000` ceiling while issuing 5x
+  // fewer requests than the old 100 — materially less rate-limit pressure on
+  // a 170k-row table.
+  const batchSize = 500;
 
   for (let i = 0; i < ids.length; i += batchSize) {
     const batchIds = ids.slice(i, i + batchSize);

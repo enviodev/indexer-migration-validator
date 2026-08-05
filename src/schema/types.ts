@@ -73,5 +73,22 @@ export interface GeneratorResult {
 export interface Overrides {
   fieldMappings?: Record<string, Record<string, string>>; // Entity -> { subgraphField: hyperindexField }
   knownIdMismatch?: string[];
+  /**
+   * Entities whose IDs are KNOWN to match, overriding the `detectIdMismatch`
+   * name heuristic in configGenerator.ts. That heuristic flags any entity whose
+   * name contains e.g. "Swap" or "Delta", and a flagged entity is SILENTLY
+   * SKIPPED in --deep mode (reported as 0/0, which reads like a pass). Without
+   * this escape hatch a migration whose Swap IDs are byte-identical cannot be
+   * deep-verified at all, because `knownIdMismatch` can only ever add to the
+   * heuristic, never clear it.
+   */
+  idMatchConfirmed?: string[];
+  /**
+   * Per-entity list of SUBGRAPH field names to exclude from comparison.
+   * Use when a field cannot be selected from one side at all — e.g. a subgraph
+   * relation typed non-null whose target row does not exist, which makes the
+   * entire GraphQL response error and silently return zero records.
+   */
+  skipFields?: Record<string, string[]>;
   skipEntities?: string[];
 }

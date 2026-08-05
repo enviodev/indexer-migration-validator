@@ -8,6 +8,7 @@ import {
   Overrides,
 } from './types.js';
 import { matchSchemas } from './matcher.js';
+import { readFileSync, existsSync } from 'fs';
 
 /**
  * Generate entity configs from subgraph and hyperindex schemas
@@ -22,9 +23,10 @@ export function generateConfigs(
   const warnings: ConfigWarning[] = [];
 
   const knownIdMismatchSet = new Set(overrides?.knownIdMismatch || []);
+  const idMatchConfirmedSet = new Set(overrides?.idMatchConfirmed || []);
 
   for (const match of matchResult.matches) {
-    const config = generateEntityConfig(match, knownIdMismatchSet);
+    const config = generateEntityConfig(match, knownIdMismatchSet, idMatchConfirmedSet);
     configs[match.subgraphEntity.name] = config;
 
     // Generate warnings
@@ -76,7 +78,8 @@ export function generateConfigs(
  */
 function generateEntityConfig(
   match: EntityMatch,
-  knownIdMismatch: Set<string>
+  knownIdMismatch: Set<string>,
+  idMatchConfirmed: Set<string> = new Set()
 ): GeneratedEntityConfig {
   const { subgraphEntity, fieldMappings } = match;
 
@@ -111,8 +114,11 @@ function generateEntityConfig(
   }
 
   // Detect if ID formats likely differ
+  // An explicit `idMatchConfirmed` entry clears the name-based heuristic, which
+  // otherwise flags entities like `Swap` and causes --deep to skip them
+  // silently. An explicit `knownIdMismatch` entry always wins.
   const hasKnownIdMismatch = knownIdMismatch.has(subgraphEntity.name) ||
-    detectIdMismatch(subgraphEntity.name);
+    (!idMatchConfirmed.has(subgraphEntity.name) && detectIdMismatch(subgraphEntity.name));
 
   return {
     subgraphName,
@@ -140,6 +146,7 @@ function toSubgraphQueryName(entityName: string): string {
     'Token4HourData': 'token4HourDatas',
     'CollectionMetadata': 'collectionMetadata_collection', // Immutable entity uses _collection suffix
     'MemecoinTreasury': 'memecoinTreasuries',
+    'User': 'users', // Explicit plural for User entity
   };
 
   if (specialCases[entityName]) {
@@ -220,12 +227,19 @@ export function generateTypeScriptConfig(configs: Record<string, GeneratedEntity
  * Load overrides from a JSON file
  */
 export function loadOverrides(filePath: string): Overrides {
+  // NOTE: this used `require('fs')`, which is undefined in this ESM package
+  // ("type": "module"). The bare catch then swallowed the ReferenceError and
+  // returned {}, so overrides.json was SILENTLY IGNORED on every run —
+  // fieldMappings, knownIdMismatch, idMatchConfirmed and skipEntities all had
+  // no effect. Failures are now reported instead of hidden.
+  if (!existsSync(filePath)) {
+    console.warn(`[overrides] not found: ${filePath} - continuing with no overrides`);
+    return {};
+  }
   try {
-    const fs = require('fs');
-    const content = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(content) as Overrides;
+    return JSON.parse(readFileSync(filePath, 'utf-8')) as Overrides;
   } catch (error) {
-    // Return empty overrides if file doesn't exist or is invalid
+    console.warn(`[overrides] failed to parse ${filePath}: ${(error as Error).message}`);
     return {};
   }
 }

@@ -1,4 +1,5 @@
 import { getEntityConfigs } from '../config.js';
+import { stripChainPrefix } from '../runtime.js';
 
 /**
  * Get config for an entity
@@ -57,7 +58,8 @@ export function normalizeHyperIndexResponse(
   const fieldMapping = config.fieldMapping || {};
 
   for (const record of records) {
-    const id = record.id as string;
+    // Keyed bare so the map lines up with the subgraph's unprefixed IDs.
+    const id = stripChainPrefix(record.id as string);
     const flat: Record<string, unknown> = {};
 
     // Copy direct fields - translate renamed fields
@@ -66,12 +68,25 @@ export function normalizeHyperIndexResponse(
     for (const subgraphField of config.fields) {
       const hyperindexField = fieldMapping[subgraphField] || subgraphField;
       // Store using subgraph field name (for comparison with subgraph data)
-      flat[subgraphField] = normalizeValue(record[hyperindexField]);
+      const value = normalizeValue(record[hyperindexField]);
+      // `id` is also a comparable FIELD, not just the map key — strip it too,
+      // or every row reports an `id` mismatch ("1776-0xabc" vs "0xabc") even
+      // though the sets line up perfectly.
+      flat[subgraphField] =
+        subgraphField === 'id' && typeof value === 'string'
+          ? stripChainPrefix(value)
+          : value;
     }
 
-    // Copy foreign key fields (already flat in HyperIndex)
+    // Copy foreign key fields (already flat in HyperIndex).
+    //
+    // These hold ENTITY IDs, so on a multichain indexer they carry the chain
+    // prefix too and must be stripped — otherwise every relation reports as a
+    // mismatch ("1776-0xabc" vs "0xabc"). Applied only to FK columns, never to
+    // ordinary string fields, which may legitimately look prefix-like.
     for (const flatField of Object.values(config.nestedFields)) {
-      flat[flatField] = normalizeValue(record[flatField]);
+      const value = normalizeValue(record[flatField]);
+      flat[flatField] = typeof value === 'string' ? stripChainPrefix(value) : value;
     }
 
     normalized.set(id, flat);

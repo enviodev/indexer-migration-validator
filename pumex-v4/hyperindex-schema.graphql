@@ -1,0 +1,318 @@
+# GENERATED from the live HyperIndex endpoint by `pnpm introspect`.
+# Do not hand-edit — regenerate instead.
+#
+# Relations are FLATTENED to their `<name>_id` scalar column, which is what the
+# API actually serves and what the matcher maps subgraph relations onto.
+# Object/list relationship fields are omitted: they are Hasura navigation, not
+# stored columns.
+
+type Bundle {
+  id: String!
+  nativePriceUSD: numeric!
+}
+
+type ModifyLiquidity {
+  amount: numeric!
+  amount0: numeric!
+  amount1: numeric!
+  amountUSD: numeric
+  id: String!
+  logIndex: numeric
+  origin: String!
+  pool_id: String!
+  salt: String!
+  sender: String
+  tickLower: numeric!
+  tickUpper: numeric!
+  timestamp: numeric!
+  token0_id: String!
+  token1_id: String!
+  transactionLogIndex: numeric
+  transaction_id: String!
+}
+
+type ModifyLiquidityCache {
+  hash: String!
+  id: String!
+  logIndex: numeric!
+  modifyLiquidities: [String!]!
+}
+
+type Pool {
+  collectedFeesToken0: numeric!
+  collectedFeesToken1: numeric!
+  collectedFeesUSD: numeric!
+  createdAtBlockNumber: numeric!
+  createdAtTimestamp: numeric!
+  dynamicLPFee: Boolean!
+  feeTier: numeric!
+  feesUSD: numeric!
+  hooks: String!
+  hooksRegistration: String!
+  id: String!
+  liquidity: numeric!
+  liquidityProviderCount: numeric!
+  lpFee: numeric!
+  lpFeesUSD: numeric!
+  observationIndex: numeric!
+  parameters: String!
+  protocolFee: numeric!
+  protocolFeesUSD: numeric!
+  sqrtPrice: numeric!
+  swapFee: numeric!
+  tick: numeric
+  tickSpacing: numeric!
+  token0Price: numeric!
+  token0_id: String!
+  token1Price: numeric!
+  token1_id: String!
+  totalValueLockedNative: numeric!
+  totalValueLockedToken0: numeric!
+  totalValueLockedToken1: numeric!
+  totalValueLockedUSD: numeric!
+  totalValueLockedUSDUntracked: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volumeToken0: numeric!
+  volumeToken1: numeric!
+  volumeUSD: numeric!
+}
+
+type PoolDayData {
+  close: numeric!
+  date: Int!
+  feesUSD: numeric!
+  high: numeric!
+  id: String!
+  liquidity: numeric!
+  low: numeric!
+  lpFeesUSD: numeric!
+  open: numeric!
+  pool_id: String!
+  protocolFeesUSD: numeric!
+  sqrtPrice: numeric!
+  tick: numeric
+  token0Price: numeric!
+  token1Price: numeric!
+  tvlUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volumeToken0: numeric!
+  volumeToken1: numeric!
+  volumeUSD: numeric!
+}
+
+type PoolHourData {
+  close: numeric!
+  feesUSD: numeric!
+  high: numeric!
+  id: String!
+  liquidity: numeric!
+  low: numeric!
+  lpFeesUSD: numeric!
+  open: numeric!
+  periodStartUnix: Int!
+  pool_id: String!
+  protocolFeesUSD: numeric!
+  sqrtPrice: numeric!
+  tick: numeric
+  token0Price: numeric!
+  token1Price: numeric!
+  tvlUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volumeToken0: numeric!
+  volumeToken1: numeric!
+  volumeUSD: numeric!
+}
+
+type PoolManager {
+  id: String!
+  owner: String!
+  poolCount: numeric!
+  totalFeesNative: numeric!
+  totalFeesUSD: numeric!
+  totalLpFeesNative: numeric!
+  totalLpFeesUSD: numeric!
+  totalProtocolFeesNative: numeric!
+  totalProtocolFeesUSD: numeric!
+  totalValueLockedNative: numeric!
+  totalValueLockedNativeUntracked: numeric!
+  totalValueLockedUSD: numeric!
+  totalValueLockedUSDUntracked: numeric!
+  totalVolumeNative: numeric!
+  totalVolumeUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+}
+
+type Position {
+  createdAtBlock: numeric!
+  createdAtTimestamp: numeric!
+  depositedToken0: numeric
+  depositedToken1: numeric
+  id: String!
+  liquidity: numeric!
+  origin: String!
+  owner: String!
+  pool_id: String!
+  tickLower: numeric!
+  tickUpper: numeric!
+  token0Balance: numeric!
+  token1Balance: numeric!
+  tokenId: numeric!
+  withdrawnToken0: numeric
+  withdrawnToken1: numeric
+}
+
+type ProtocolDayData {
+  date: Int!
+  feesUSD: numeric!
+  id: String!
+  lpFeesUSD: numeric!
+  protocolFeesUSD: numeric!
+  tvlUSD: numeric!
+  txCount: numeric!
+  volumeNative: numeric!
+  volumeUSD: numeric!
+  volumeUSDUntracked: numeric!
+}
+
+type Subscribe {
+  address: String!
+  id: String!
+  logIndex: numeric!
+  origin: String!
+  position_id: String!
+  timestamp: numeric!
+  tokenId: numeric!
+  transaction_id: String!
+}
+
+type Swap {
+  amount0: numeric!
+  amount0Raw: numeric!
+  amount1: numeric!
+  amount1Raw: numeric!
+  amountUSD: numeric!
+  id: String!
+  logIndex: numeric
+  lpFee: numeric!
+  origin: String!
+  pool_id: String!
+  protocolFee: numeric!
+  sender: String!
+  sqrtPriceX96: numeric!
+  swapFee: numeric!
+  tick: numeric!
+  timestamp: numeric!
+  token0_id: String!
+  token1_id: String!
+  transaction_id: String!
+}
+
+type Tick {
+  createdAtBlockNumber: numeric!
+  createdAtTimestamp: numeric!
+  id: String!
+  liquidityGross: numeric!
+  liquidityNet: numeric!
+  poolAddress: String
+  pool_id: String!
+  price0: numeric!
+  price1: numeric!
+  tickIdx: numeric!
+}
+
+type Token {
+  decimals: numeric!
+  derivedNative: numeric!
+  derivedUSD: numeric!
+  feesUSD: numeric!
+  id: String!
+  lpFeesUSD: numeric!
+  name: String!
+  poolCount: numeric!
+  protocolFeesUSD: numeric!
+  symbol: String!
+  totalSupply: numeric!
+  totalValueLocked: numeric!
+  totalValueLockedUSD: numeric!
+  totalValueLockedUSDUntracked: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volume: numeric!
+  volumeUSD: numeric!
+  whitelistPools: [String!]!
+}
+
+type TokenDayData {
+  close: numeric!
+  date: Int!
+  feesUSD: numeric!
+  high: numeric!
+  id: String!
+  low: numeric!
+  lpFeesUSD: numeric!
+  open: numeric!
+  priceUSD: numeric!
+  protocolFeesUSD: numeric!
+  token_id: String!
+  totalValueLocked: numeric!
+  totalValueLockedUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volume: numeric!
+  volumeUSD: numeric!
+}
+
+type TokenHourData {
+  close: numeric!
+  feesUSD: numeric!
+  high: numeric!
+  id: String!
+  low: numeric!
+  lpFeesUSD: numeric!
+  open: numeric!
+  periodStartUnix: Int!
+  priceUSD: numeric!
+  protocolFeesUSD: numeric!
+  token_id: String!
+  totalValueLocked: numeric!
+  totalValueLockedUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volume: numeric!
+  volumeUSD: numeric!
+}
+
+type Transaction {
+  blockNumber: numeric!
+  gasPrice: numeric!
+  gasUsed: numeric!
+  id: String!
+  timestamp: numeric!
+}
+
+type Transfer {
+  from: String!
+  id: String!
+  logIndex: numeric!
+  origin: String!
+  position_id: String!
+  timestamp: numeric!
+  to: String!
+  tokenId: numeric!
+  transaction_id: String!
+}
+
+type Unsubscribe {
+  address: String!
+  id: String!
+  logIndex: numeric!
+  origin: String!
+  position_id: String!
+  timestamp: numeric!
+  tokenId: numeric!
+  transaction_id: String!
+}
