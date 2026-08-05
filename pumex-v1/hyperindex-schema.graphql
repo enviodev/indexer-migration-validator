@@ -1,0 +1,220 @@
+# GENERATED from the live HyperIndex endpoint by `pnpm introspect`.
+# Do not hand-edit — regenerate instead.
+#
+# Relations are FLATTENED to their `<name>_id` scalar column, which is what the
+# API actually serves and what the matcher maps subgraph relations onto.
+# Object/list relationship fields are omitted: they are Hasura navigation, not
+# stored columns.
+
+type Bundle {
+  ethPrice: numeric!
+  id: String!
+}
+
+type Burn {
+  amount0: numeric
+  amount1: numeric
+  amountUSD: numeric
+  feeLiquidity: numeric
+  feeTo: String
+  id: String!
+  liquidity: numeric!
+  logIndex: numeric
+  needsComplete: Boolean!
+  pair_id: String!
+  sender: String
+  timestamp: numeric!
+  to: String
+  transaction_id: String!
+}
+
+type DayData {
+  dailyVolumeETH: numeric!
+  dailyVolumeUSD: numeric!
+  dailyVolumeUntracked: numeric!
+  date: Int!
+  id: String!
+  totalLiquidityETH: numeric!
+  totalLiquidityUSD: numeric!
+  totalVolumeETH: numeric!
+  totalVolumeUSD: numeric!
+  txCount: numeric!
+}
+
+type Factory {
+  id: String!
+  pairCount: Int!
+  totalLiquidityETH: numeric!
+  totalLiquidityUSD: numeric!
+  totalVolumeETH: numeric!
+  totalVolumeUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+}
+
+type LiquidityPosition {
+  id: String!
+  liquidityTokenBalance: numeric!
+  pair_id: String!
+  user_id: String!
+}
+
+type LiquidityPositionSnapshot {
+  block: Int!
+  id: String!
+  liquidityPosition_id: String!
+  liquidityTokenBalance: numeric!
+  liquidityTokenTotalSupply: numeric!
+  pair_id: String!
+  reserve0: numeric!
+  reserve1: numeric!
+  reserveUSD: numeric!
+  timestamp: Int!
+  token0PriceUSD: numeric!
+  token1PriceUSD: numeric!
+  user_id: String!
+}
+
+type Mint {
+  amount0: numeric
+  amount1: numeric
+  amountUSD: numeric
+  feeLiquidity: numeric
+  feeTo: String
+  id: String!
+  liquidity: numeric!
+  logIndex: numeric
+  pair_id: String!
+  sender: String
+  timestamp: numeric!
+  to: String!
+  transaction_id: String!
+}
+
+type Pair {
+  createdAtBlockNumber: numeric!
+  createdAtTimestamp: numeric!
+  id: String!
+  isStable: Boolean!
+  liquidityProviderCount: numeric!
+  reserve0: numeric!
+  reserve1: numeric!
+  reserveETH: numeric!
+  reserveUSD: numeric!
+  token0Price: numeric!
+  token0_id: String!
+  token1Price: numeric!
+  token1_id: String!
+  totalSupply: numeric!
+  trackedReserveETH: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+  volumeToken0: numeric!
+  volumeToken1: numeric!
+  volumeUSD: numeric!
+}
+
+type PairCreated {
+  blockNumber: numeric!
+  blockTimestamp: numeric!
+  id: String!
+  pair: String!
+  param4: numeric!
+  stable: Boolean!
+  token0: String!
+  token1: String!
+  transactionHash: String!
+}
+
+type PairDayData {
+  dailyTxns: numeric!
+  dailyVolumeToken0: numeric!
+  dailyVolumeToken1: numeric!
+  dailyVolumeUSD: numeric!
+  date: Int!
+  id: String!
+  pairAddress: String!
+  reserve0: numeric!
+  reserve1: numeric!
+  reserveUSD: numeric!
+  token0_id: String!
+  token1_id: String!
+  totalSupply: numeric!
+}
+
+type PairHourData {
+  hourStartUnix: Int!
+  hourlyTxns: numeric!
+  hourlyVolumeToken0: numeric!
+  hourlyVolumeToken1: numeric!
+  hourlyVolumeUSD: numeric!
+  id: String!
+  pair_id: String!
+  reserve0: numeric!
+  reserve1: numeric!
+  reserveUSD: numeric!
+  totalSupply: numeric!
+}
+
+type PairLookup {
+  id: String!
+  pair: String!
+}
+
+type Swap {
+  amount0In: numeric!
+  amount0Out: numeric!
+  amount1In: numeric!
+  amount1Out: numeric!
+  amountUSD: numeric!
+  from: String!
+  id: String!
+  logIndex: numeric
+  pair_id: String!
+  sender: String!
+  timestamp: numeric!
+  to: String!
+  transaction_id: String!
+}
+
+type Token {
+  decimals: numeric!
+  derivedETH: numeric
+  id: String!
+  name: String!
+  symbol: String!
+  totalLiquidity: numeric!
+  totalSupply: numeric!
+  tradeVolume: numeric!
+  tradeVolumeUSD: numeric!
+  txCount: numeric!
+  untrackedVolumeUSD: numeric!
+}
+
+type TokenDayData {
+  dailyTxns: numeric!
+  dailyVolumeETH: numeric!
+  dailyVolumeToken: numeric!
+  dailyVolumeUSD: numeric!
+  date: Int!
+  id: String!
+  priceUSD: numeric!
+  token_id: String!
+  totalLiquidityETH: numeric!
+  totalLiquidityToken: numeric!
+  totalLiquidityUSD: numeric!
+}
+
+type Transaction {
+  blockNumber: numeric!
+  burns: [String!]!
+  id: String!
+  mints: [String!]!
+  swaps: [String!]!
+  timestamp: numeric!
+}
+
+type User {
+  id: String!
+  usdSwapped: numeric!
+}

@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Pumex CL Analytics (TAC 239) — Goldsky cl-analytics-tac/v1.0.1 vs HyperIndex ccf39cd.",
+    "hyperindex-schema.graphql is generated via `pnpm introspect` (flat *_id FKs).",
+    "Swap is idMatchConfirmed so --deep does not silently skip it (name heuristic).",
+    "Fee-cache / PositionTransferCache entities are ephemeral subgraph helpers —",
+    "compare them, but expect possible emptiness differences if Goldsky pruned them."
+  ],
+
+  "fieldMappings": {},
+
+  "knownIdMismatch": [],
+
+  "idMatchConfirmed": [
+    "Swap"
+  ],
+
+  "skipFields": {
+    "Token": ["whitelistPools"],
+    "Transaction": ["mints", "burns", "swaps", "collects", "flashes"]
+  },
+
+  "skipEntities": []
+}

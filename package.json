@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "compare": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:user": "tsx test-user-query.ts",
+    "test:entities": "tsx test-user-marketplace.ts",
+    "introspect": "tsx introspect-hyperindex.ts"
   },
   "dependencies": {
     "dotenv": "^17.2.3",

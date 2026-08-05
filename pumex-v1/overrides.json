@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Pumex v1 (Linea 59144) - subgraph `lynex-v1` vs HyperIndex `pumex-v1-indexer`.",
+    "Entity and field names are identical between the two schemas, so no",
+    "fieldMappings are needed. Relations map automatically onto their `<name>_id`",
+    "column because pumex-v1/hyperindex-schema.graphql is generated from the LIVE",
+    "endpoint via `pnpm introspect`, and therefore contains the flat FK columns.",
+    "See pumex-v1/README.md for rationale and known limitations."
+  ],
+
+  "fieldMappings": {},
+
+  "knownIdMismatch": [],
+
+  "idMatchConfirmed": [
+    "Swap"
+  ],
+
+  "skipFields": {
+    "LiquidityPosition": ["user"],
+    "LiquidityPositionSnapshot": ["user"]
+  },
+
+  "skipEntities": []
+}
