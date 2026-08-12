@@ -168,6 +168,7 @@ CSS = """
   --accent:#0B6E63; --accent-soft:#E4F0EE;
   --match:#2E7355; --ulp:#6A7480; --attention:#8F6410; --defect:#A33C31;
   --stripe-match:#2E7355; --stripe-ulp:#B9C2C9; --stripe-attention:#C98F1C; --stripe-defect:#A33C31;
+  --diff-wash:#F6E3E0;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -176,6 +177,7 @@ CSS = """
     --accent:#45B8A8; --accent-soft:#12302C;
     --match:#58B189; --ulp:#8894A0; --attention:#D6A33D; --defect:#E07A6C;
     --stripe-match:#58B189; --stripe-ulp:#3A454F; --stripe-attention:#D6A33D; --stripe-defect:#E07A6C;
+    --diff-wash:#3A211D;
   }
 }
 :root[data-theme="dark"]{
@@ -184,6 +186,7 @@ CSS = """
   --accent:#45B8A8; --accent-soft:#12302C;
   --match:#58B189; --ulp:#8894A0; --attention:#D6A33D; --defect:#E07A6C;
   --stripe-match:#58B189; --stripe-ulp:#3A454F; --stripe-attention:#D6A33D; --stripe-defect:#E07A6C;
+  --diff-wash:#3A211D;
 }
 :root[data-theme="light"]{
   --ground:#F5F7F8; --panel:#FFFFFF; --panel-2:#FAFBFC;
@@ -191,6 +194,7 @@ CSS = """
   --accent:#0B6E63; --accent-soft:#E4F0EE;
   --match:#2E7355; --ulp:#6A7480; --attention:#8F6410; --defect:#A33C31;
   --stripe-match:#2E7355; --stripe-ulp:#B9C2C9; --stripe-attention:#C98F1C; --stripe-defect:#A33C31;
+  --diff-wash:#F6E3E0;
 }
 
 *{box-sizing:border-box}
@@ -316,8 +320,8 @@ code{font-size:.87em;background:var(--panel-2);border:1px solid var(--rule-soft)
 .ruler .rl + .rl{margin-top:5px}
 .ruler .side{color:var(--muted);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
 .ruler .same{color:var(--muted)}
-.ruler .diff{color:var(--defect);font-weight:700;background:color-mix(in srgb,var(--defect) 13%,transparent);
-  border-radius:2px;padding:1px 0}
+.ruler .diff{color:var(--defect);font-weight:700;background:var(--diff-wash);
+  border-radius:2px;padding:1px 0;box-shadow:0 1px 0 var(--defect)}
 .ruler .caption{margin-top:12px;font-size:12.5px;color:var(--muted);white-space:normal;
   font-family:ui-serif,Georgia,serif}
 
@@ -390,14 +394,47 @@ REASONS = {
  ("helper-4663","Block"): 'disjoint id sets, wrong <code>VeToken</code> &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
  ("helper-4663","VeToken"): 'different contract address &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
  ("helper-4663","VeTokenSnapshot"): 'disjoint id sets, wrong <code>VeToken</code> &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
+ ("helper-9745","DepositTokenBalance"): 'rounding &mdash; every difference is dust vs exactly 0, '
+   'largest absolute 1.4&times;10<sup>-28</sup> tokens (<a href="#case-ulp">case&nbsp;1</a>)',
+
+ ("analytics-239","Swap"): '2,926 rows inside the 29-hour gap; <code>reserves*</code> reflect the stale '
+   'pool state (<a href="#case-swap">case&nbsp;6</a>). <code>amountUSD</code> is rounding',
+ ("analytics-239","Transaction"): '2,233 rows inside the 29-hour gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("analytics-239","AlgebraHourData"): '29 missing hourly buckets = the gap duration exactly; accumulators '
+   'short by it (<a href="#case-swap">case&nbsp;6</a>)',
+ ("analytics-239","AlgebraDayData"): 'bucket + accumulators spanning the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("analytics-239","PoolHourData"): 'missing buckets + accumulators spanning the gap; 24,511 of 25,283 '
+   'differences are rounding',
+ ("analytics-239","PoolDayData"): 'missing buckets + accumulators spanning the gap; 10,097 of 10,591 '
+   'differences are rounding',
+ ("analytics-239","TokenHourData"): 'missing buckets; 47,118 of 48,745 differences are rounding. The '
+   'remainder is the stale WETH price (<a href="#case-swap">case&nbsp;6</a>)',
+ ("analytics-239","TokenDayData"): 'missing buckets; 12,185 of 13,430 differences are rounding',
+ ("analytics-239","Burn"): '+1 row: the subgraph missed an on-chain <code>Burn</code> '
+   '(<a href="#case-farm">case&nbsp;5</a>). 2,615 of 2,623 field differences are rounding',
+ ("analytics-239","Mint"): 'rounding only &mdash; <a href="#case-ulp">case&nbsp;1</a>',
+ ("analytics-239","Pool"): 'the <code>WETH/USD&#8372;</code> pool holds stale state from the gap; other '
+   'pools differ only in accumulators (<a href="#case-swap">case&nbsp;6</a>)',
+ ("analytics-239","Token"): '<code>derivedMatic</code> wrong for the 5 tokens priced through WETH, all by '
+   'the same 41.0194% &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("analytics-239","Factory"): 'global accumulators short by the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("analytics-239","Tick"): 'liquidity accumulators spanning the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("analytics-239","PoolPosition"): 'liquidity accumulator spanning the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
 }
+
+
+# Map the case kind onto a colour token that actually exists. "open" has no
+# token of its own and "none" must not resolve to var(--none), which is
+# undefined and silently leaves the line inheriting body colour.
+KIND_TOKEN = {"ulp": "ulp", "defect": "defect", "attention": "attention",
+              "open": "attention", "none": "muted"}
 
 
 def case(cid, num, kind, title, verdictline, body):
     return f"""<article class="case k-{kind}" id="{cid}">
   <div class="case-num">Case {num}</div>
   <h3>{title}</h3>
-  <div class="verdictline" style="color:var(--{kind if kind!='open' else 'attention'})">{verdictline}</div>
+  <div class="verdictline" style="color:var(--{KIND_TOKEN[kind]})">{verdictline}</div>
   {body}
 </article>"""
 
@@ -474,28 +511,35 @@ def build_cases():
       + "<p><strong>This is reported as open.</strong> No root cause has been established, and none is "
         "asserted here.</p>"))
 
-    c.append(case("case-farm", 5, "attention", "The subgraph missed two DecreaseLiquidity logs",
-      "New this session · subgraph defect · Envio matches the chain",
-      "<p>One field differs across all 917 <code>Farm_Deposit</code> rows: deposit <code>743</code>, field "
-      "<code>liquidity</code>. Every other field on that row &mdash; owner, pool, eternalFarming &mdash; "
-      "matches exactly, and every other row matches exactly.</p>"
-      + '<div class="ev"><table><thead><tr><th>side</th><th>liquidity</th></tr></thead><tbody>'
-        "<tr><td>subgraph</td><td>148,816,099</td></tr>"
-        "<tr><td>merged indexer</td><td>1</td></tr>"
+    c.append(case("case-farm", 5, "attention", "The subgraph has its own gap, around block 17,530,0xx",
+      "New this session · subgraph defect · Envio matches the chain in both instances",
+      "<p>Two differences on chain 239 run the opposite way to case&nbsp;6: the merged indexer is right "
+      "and the <em>subgraph</em> is missing on-chain events. Both sit within 76 blocks of each other.</p>"
+      + "<p><strong>farm / <code>Deposit</code> 743, field <code>liquidity</code>.</strong> One field "
+        "differs across all 917 rows; every other field on that row matches. The subgraph reports "
+        "148,816,099, the merged indexer reports 1. Queried against the chain, two "
+        "<code>DecreaseLiquidity</code> logs exist at block <code>17,530,001</code> for tokenId 743, each "
+        "for 74,408,049 &mdash; transactions <code>0x042bb1dc&hellip;</code> and "
+        "<code>0x816ff3b3&hellip;</code>. Two of them come to 148,816,098, and "
+        "148,816,099 &minus; 148,816,098 = <strong>1</strong>. The subgraph applied neither decrement; "
+        "Envio applied both.</p>"
+      + "<p><strong>analytics / one extra <code>Burn</code>.</strong> The merged indexer holds a Burn the "
+        "subgraph does not &mdash; <code>0xe3845604&hellip;#1</code> at block <code>17,530,077</code>. This "
+        "is the only surplus row anywhere in the campaign. The subgraph has the transaction but attaches "
+        "no burns to it at all. On chain, that pool emits a <code>Burn</code> at logIndex&nbsp;1 of that "
+        "block, and its payload matches the merged indexer field for field:</p>"
+      + '<div class="ev"><table><thead><tr><th>field</th><th>on-chain log</th><th>merged indexer</th></tr></thead><tbody>'
+        "<tr><td>liquidityAmount</td><td>3704705692194729292</td><td>3704705692194729292</td></tr>"
+        "<tr><td>amount0</td><td>9076256972469804</td><td>0.009076256972469804</td></tr>"
+        "<tr><td>amount1</td><td>72011181065089699</td><td>0.072011181065089699</td></tr>"
         "</tbody></table></div>"
-      + "<p>Queried directly against the chain, two <code>DecreaseLiquidity</code> logs exist at block "
-        "<code>17,530,001</code> for tokenId 743, each for 74,408,049:</p>"
-      + '<div class="ev"><table><thead><tr><th>transaction</th><th>liquidity</th></tr></thead><tbody>'
-        "<tr><td>0x042bb1dcf4e592b807e47ccdff2ed347a855f9d7272619d09d2e1ee609415fa6</td><td>74,408,049</td></tr>"
-        "<tr><td>0x816ff3b33ee0c60fa23bc4a5dd94eae638113a0c52df03e40ac6cf169d67ffa2</td><td>74,408,049</td></tr>"
-        "</tbody></table></div>"
-      + "<p>2 &times; 74,408,049 = 148,816,098, and 148,816,099 &minus; 148,816,098 = <strong>1</strong> "
-        "&mdash; exactly the merged indexer's value. The subgraph applied neither decrement; Envio applied "
-        "both. <strong>Envio is correct and the subgraph is stale.</strong></p>"
-      + "<p>This is also why this figure appears to contradict the previously recorded &ldquo;0 field "
-        "diffs&rdquo; for farm/239. It does not: the ad-hoc <code>cmp_farm.ts</code> carries this exact row "
-        "in a <code>KNOWN_DIVERGENCES</code> filter and subtracts it before reporting. Both numbers are "
-        "right; this report does not filter.</p>"))
+      + "<p>Two independent misses in the same 76-block neighbourhood points to an indexing incident on the "
+        "Goldsky side around block 17,530,0xx, rather than two coincidences. <strong>In both cases Envio "
+        "matches the chain and the subgraph does not.</strong></p>"
+      + "<p>This is also why the farm figure appears to contradict the previously recorded &ldquo;0 field "
+        "diffs&rdquo;. It does not: the ad-hoc <code>cmp_farm.ts</code> carries this exact row in a "
+        "<code>KNOWN_DIVERGENCES</code> filter and subtracts it before reporting. Both numbers are right; "
+        "this report does not filter.</p>"))
 
     c.append(case("case-swap", 6, "defect", "A 29-hour indexing gap on chain 239",
       "New this session · confirmed · the most consequential finding in this report",
