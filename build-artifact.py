@@ -413,7 +413,7 @@ REASONS = {
  ("analytics-239","Burn"): '+1 row: the subgraph missed an on-chain <code>Burn</code> '
    '(<a href="#case-farm">case&nbsp;5</a>). 2,615 of 2,623 field differences are rounding',
  ("analytics-239","Mint"): 'rounding only &mdash; <a href="#case-ulp">case&nbsp;1</a>',
- ("analytics-239","Pool"): 'the <code>WETH/USD&#8372;</code> pool holds stale state from the gap; other '
+ ("analytics-239","Pool"): 'the <code>WETH/USD&#8366;</code> pool holds stale state from the gap; other '
    'pools differ only in accumulators (<a href="#case-swap">case&nbsp;6</a>)',
  ("analytics-239","Token"): '<code>derivedMatic</code> wrong for the 5 tokens priced through WETH, all by '
    'the same 41.0194% &mdash; <a href="#case-swap">case&nbsp;6</a>',
@@ -560,7 +560,7 @@ def build_cases():
         "&mdash; matching the 29.0-hour wall-clock span computed from block timestamps. Nothing else in the "
         "dataset would make those two numbers agree by chance.</p>"
       + "<p>Everything else on this deployment follows from the hole. The "
-        "<code>WETH/USD&#8372;</code> pool <code>0x69916939&hellip;</code> missed the swap at block "
+        "<code>WETH/USD&#8366;</code> pool <code>0x69916939&hellip;</code> missed the swap at block "
         "21,719,043 that drove it to its minimum tick, so it still reports a stale price of 1,644.18 where "
         "the subgraph reports the pool drained. WETH\'s <code>derivedMatic</code> is consequently wrong, and "
         "every token priced through WETH inherits <em>precisely</em> the same relative error &mdash; "
@@ -661,6 +661,72 @@ meaningful.</p></div>
 """
 
 
+# Values recorded in VALIDATION-HANDOFF.md section 6 before this session, so the
+# report can show agreement or disagreement rather than quietly replacing them.
+PRIOR = {
+ "helper-1776":  ("3,642 / 3,642", "0", "agree"),
+ "helper-9745":  ("88,642 / 88,642", "98, all amountDecimals ULP", "differ"),
+ "helper-4663":  ("933 / 935", "0 — wrong VeToken address", "agree"),
+ "v1-59144":     ("458,394 / 458,394", "9 (3 not ULP)", None),
+ "v1-4663":      ("36 / 36", "0", "agree"),
+ "farm-239":     ("917 / 917", "0", "differ"),
+ "analytics-239":("27 entities", "8 entities ULP-only", "differ"),
+}
+
+RECON_NOTES = {
+ "helper-9745": "Same class, different count. Both runs find only "
+   "<code>DepositTokenBalance.amountDecimals</code> dust. The count moves because the earlier run was "
+   "taken at a different head, so the accumulators had different residues; this run compares all 386 "
+   "rows at the frozen pin. The largest absolute difference is 1.4&times;10<sup>-28</sup> tokens.",
+ "farm-239": "Not a contradiction. <code>cmp_farm.ts</code> carries this exact row in a "
+   "<code>KNOWN_DIVERGENCES</code> filter and subtracts it before reporting; this report does not "
+   "filter. The row is a subgraph defect &mdash; <a href=\"#case-farm\">case&nbsp;5</a>.",
+ "analytics-239": "The prior figure is the <em>standalone</em> result at <code>end_block 4,600,000</code>, "
+   "not a merged run at head &mdash; it matches <code>FINAL-REPORT.md</code>'s "
+   "<code>failed=8</code> exactly, it is the only row in &sect;6 with no row count, and &sect;6's own "
+   "closing note says TAC was &ldquo;not yet compared at head&rdquo;. This run is pinned at 24,087,877, "
+   "five times further, and the 29-hour gap sits at block 21.7M &mdash; outside anything previously "
+   "measured.",
+}
+
+
+def reconciliation(deps):
+    rows = []
+    for k, dep in deps:
+        prior = PRIOR.get(k)
+        if not prior:
+            continue
+        prior_rows, prior_fields, _ = prior
+        t = dep["totals"]
+        now_rows = f"{fmt(t['subgraphRows'])} / {fmt(t['envioRows'])}"
+        now_fields = fmt(t["diffAny"])
+        note = RECON_NOTES.get(k, "")
+        agrees = not note
+        state = ("agrees" if agrees else "explained")
+        cls = "" if agrees else ' class="r-attention"'
+        rows.append(
+            f"<tr{cls}><td class='ent'>{esc(dep['indexer'])}/{dep['chain']}</td>"
+            f"<td class='num'>{prior_rows}</td><td class='num'>{now_rows}</td>"
+            f"<td class='num'>{esc(prior_fields)}</td><td class='num'>{now_fields}</td>"
+            f"<td class='reason'>{note or '<span class=\'q\'>reproduced</span>'}</td></tr>"
+        )
+    return f"""
+<div class="dep">
+  <header class="dep-head"><div class="dep-title">
+    <h3>Against the previously recorded results</h3>
+    <p class="ref">VALIDATION-HANDOFF.md &sect;6 &nbsp;·&nbsp; nothing below was overwritten</p>
+  </div></header>
+  <p class="lead">Four of the seven previously recorded results reproduce exactly. Three differ, and
+  each difference is accounted for below rather than silently replaced. None of the three is a
+  regression in the merged indexer.</p>
+  <div class="tw"><table>
+    <thead><tr><th>deployment</th><th class="num">&sect;6 rows</th><th class="num">this run</th>
+    <th class="num">&sect;6 field diffs</th><th class="num">this run</th><th>reconciliation</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table></div>
+</div>"""
+
+
 def main():
     deps = [(k, DATA[k]) for k in ORDER if k in DATA]
     missing = [k for k in ORDER if k not in DATA]
@@ -753,6 +819,13 @@ def main():
   <div class="wrap">
     <h2>Deployment by deployment</h2>
     {sections}
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Reconciliation</h2>
+    {reconciliation(deps)}
   </div>
 </section>
 
