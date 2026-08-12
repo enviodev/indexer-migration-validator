@@ -1,9 +1,11 @@
 import { GraphQLClient } from 'graphql-request';
 import { HYPERINDEX_URL, getEntityConfigs } from '../config.js';
-import { chainPrefix, stripChainPrefix } from '../runtime.js';
+import { chainPrefix, stripChainPrefix, getRuntimeOptions, USER_AGENT } from '../runtime.js';
 import { requestWithRetry } from './request.js';
 
-const client = new GraphQLClient(HYPERINDEX_URL);
+const client = new GraphQLClient(HYPERINDEX_URL, {
+  headers: { 'User-Agent': USER_AGENT },
+});
 
 const PAGE_SIZE = 1000;
 
@@ -27,13 +29,26 @@ function getConfig(entityName: string) {
  * single-chain subgraph. Without it, the other chains' rows show up as
  * "missing in subgraph" and swamp the real signal.
  */
-function whereClause(after: string | null): string {
+function whereClause(entityName: string, after: string | null): string {
   const prefix = chainPrefix();
-  const clauses: string[] = [];
-  if (prefix !== undefined) clauses.push(`_like: "${prefix}%"`);
-  if (after !== null) clauses.push(`_gt: ${JSON.stringify(after)}`);
-  if (clauses.length === 0) return '';
-  return `where: {id: {${clauses.join(', ')}}}, `;
+  const idClauses: string[] = [];
+  if (prefix !== undefined) idClauses.push(`_like: "${prefix}%"`);
+  if (after !== null) idClauses.push(`_gt: ${JSON.stringify(after)}`);
+
+  const conditions: string[] = [];
+  if (idClauses.length > 0) conditions.push(`id: {${idClauses.join(', ')}}`);
+
+  // Pin this side to the same height as the subgraph's time-travel read.
+  // Applies only to entities that actually have a block column — the rest are
+  // mutable accumulators, unpinnable by construction.
+  const { hyperindexMaxBlock } = getRuntimeOptions();
+  const { blockField } = getConfig(entityName);
+  if (hyperindexMaxBlock !== undefined && blockField) {
+    conditions.push(`${blockField}: {_lte: "${hyperindexMaxBlock}"}`);
+  }
+
+  if (conditions.length === 0) return '';
+  return `where: {${conditions.join(', ')}}, `;
 }
 
 /**
@@ -46,7 +61,7 @@ function buildIdQuery(entityName: string, after: string | null): string {
   const config = getConfig(entityName);
   return `
     query {
-      ${config.hyperindexName}(${whereClause(after)}limit: ${PAGE_SIZE}, order_by: {id: asc}) {
+      ${config.hyperindexName}(${whereClause(entityName, after)}limit: ${PAGE_SIZE}, order_by: {id: asc}) {
         id
       }
     }

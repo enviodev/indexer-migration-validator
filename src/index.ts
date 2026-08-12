@@ -9,8 +9,9 @@ import {
   SUBGRAPH_SCHEMA_PATH,
   OVERRIDES_PATH,
   HYPERINDEX_SCHEMA_PATH,
+  HYPERINDEX_URL,
 } from './config.js';
-import { setRuntimeOptions } from './runtime.js';
+import { setRuntimeOptions, USER_AGENT } from './runtime.js';
 import * as subgraph from './clients/subgraph.js';
 import * as hyperindex from './clients/hyperindex.js';
 import { normalizeSubgraphResponse, normalizeHyperIndexResponse } from './comparators/normalize.js';
@@ -55,6 +56,10 @@ interface CliArgs {
   retries?: number;
   /** Minimum ms between consecutive requests, to stay under rate limits. */
   throttleMs?: number;
+  /** Entity-name prefix on a merged HyperIndex endpoint, e.g. `Helper_`. */
+  entityPrefix?: string;
+  /** Pin the HyperIndex read to this block (asymmetric partner to --end-block). */
+  hyperindexMaxBlock?: number;
 }
 
 /**
@@ -114,6 +119,12 @@ function parseArgs(): CliArgs {
     } else if (arg === '--throttle-ms' && args[i + 1]) {
       result.throttleMs = parseInt(args[i + 1], 10);
       i++;
+    } else if (arg === '--entity-prefix' && args[i + 1]) {
+      result.entityPrefix = args[i + 1];
+      i++;
+    } else if (arg === '--hyperindex-max-block' && args[i + 1]) {
+      result.hyperindexMaxBlock = parseInt(args[i + 1], 10);
+      i++;
     } else if (arg === '--generate-config') {
       result.generateConfigOnly = true;
     } else if (arg === '--config-output' && args[i + 1]) {
@@ -134,6 +145,8 @@ function parseArgs(): CliArgs {
   setRuntimeOptions({
     chainId: result.chainId,
     endBlock: result.endBlock,
+    entityPrefix: result.entityPrefix,
+    hyperindexMaxBlock: result.hyperindexMaxBlock,
     ...(result.retries !== undefined ? { retries: result.retries } : {}),
     ...(result.throttleMs !== undefined ? { throttleMs: result.throttleMs } : {}),
   });
@@ -176,6 +189,22 @@ Multichain / fair-comparison options:
                             Requests are retried with exponential backoff and
                             then THROW — a failed fetch is never reported as
                             "zero rows", which would look like missing entities.
+  --entity-prefix <p>       Entity-name prefix on a MERGED HyperIndex endpoint
+                            that serves several source subgraphs at once, e.g.
+                            'Helper_' so subgraph 'Gauge' resolves to
+                            'Helper_Gauge'. Applied to the schema lookup, the
+                            GraphQL query field AND the response key.
+  --hyperindex-max-block <n>
+                            Pin the HYPERINDEX side to this block — the
+                            asymmetric partner to --end-block, which pins only
+                            the subgraph. Filters each entity on its own block
+                            column. WITHOUT THIS, rows the indexer wrote after
+                            the subgraph's pin report as pure 'extra' with '0
+                            missing'. Entities with no block column (mutable
+                            accumulators like Gauge/User/LiquidityPosition)
+                            cannot be pinned and are only trustworthy against a
+                            stopped or caught-up indexer — check it has not
+                            moved at the END of the run.
   --throttle-ms <n>         Minimum ms between requests. Hosted HyperIndex
                             endpoints return 429 under sustained paging; pacing
                             avoids tripping the limit at all. 429/503 also get
@@ -213,6 +242,59 @@ Multichain examples:
 
 See examples/ directory for sample configurations.
 `);
+}
+
+/**
+ * Per-chain `latest_processed_block` on the HyperIndex side.
+ *
+ * Sampled before and after every run. Entities with no block column cannot be
+ * pinned (see --hyperindex-max-block), so their comparison is only valid if the
+ * indexer did not advance while it was being read. Without this check a run
+ * that drifted mid-flight is indistinguishable from a clean one, and the drift
+ * shows up as field mismatches on exactly the mutable accumulators that are
+ * hardest to reason about.
+ */
+async function readIndexerHead(): Promise<Record<number, number>> {
+  const response = await fetch(HYPERINDEX_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'User-Agent': USER_AGENT },
+    body: JSON.stringify({
+      query: '{ chain_metadata { chain_id latest_processed_block } }',
+    }),
+  });
+  const body = (await response.json()) as {
+    data?: { chain_metadata?: Array<{ chain_id: number; latest_processed_block: number }> };
+  };
+  const heads: Record<number, number> = {};
+  for (const row of body.data?.chain_metadata ?? []) {
+    heads[row.chain_id] = row.latest_processed_block;
+  }
+  return heads;
+}
+
+function reportHeadDrift(
+  before: Record<number, number>,
+  after: Record<number, number>,
+  chainId?: number,
+): void {
+  const chains = chainId === undefined
+    ? Object.keys(before).map(Number)
+    : [chainId];
+
+  const moved = chains.filter(c => before[c] !== after[c]);
+  if (moved.length === 0) {
+    const shown = chains.map(c => `${c}@${before[c]}`).join(' ');
+    console.log(`\n[head] indexer did not move during this run (${shown}).`);
+    return;
+  }
+
+  console.warn(
+    `\n[head] \x1b[31mINDEXER MOVED DURING THIS RUN\x1b[0m — unpinnable entities ` +
+      `(those with no block column) may show spurious differences:`,
+  );
+  for (const c of moved) {
+    console.warn(`  chain ${c}: ${before[c]} -> ${after[c]} (+${after[c] - before[c]})`);
+  }
 }
 
 interface IdSampleResult {
@@ -422,9 +504,11 @@ async function deepCompareEntity(entityName: string, limit?: number): Promise<En
   // "deep, no caps" comparison that quietly skipped 140k of 171k Transactions.
   // A cap now only exists if the caller passed --deep-limit explicitly.
   const effectiveLimit = limit;
+  let comparisonTruncated = false;
   if (effectiveLimit && commonIds.length > effectiveLimit) {
     console.log(`  Limiting to ${effectiveLimit} records (of ${commonIds.length} common)`);
     idsToCompare = commonIds.slice(0, effectiveLimit);
+    comparisonTruncated = true;
   }
 
   // Fetch full data for all common IDs with progress
@@ -452,6 +536,7 @@ async function deepCompareEntity(entityName: string, limit?: number): Promise<En
   diff.hyperindexCount = hyperindexIds.length;
   diff.missingInHyperindex = missingInHyperindex;
   diff.missingInSubgraph = missingInSubgraph;
+  diff.comparisonTruncated = comparisonTruncated;
 
   return diff;
 }
@@ -672,6 +757,12 @@ async function main(): Promise<void> {
   };
 
   const diffs: EntityDiff[] = [];
+  const headBefore = await readIndexerHead();
+  console.log(
+    `Indexer head at start: ${Object.entries(headBefore)
+      .map(([c, b]) => `${c}@${b}`)
+      .join(' ')}`,
+  );
 
   try {
     for (const entityName of args.entities) {
@@ -688,6 +779,8 @@ async function main(): Promise<void> {
 
     // Print summary
     printSummary(diffs);
+
+    reportHeadDrift(headBefore, await readIndexerHead(), args.chainId);
 
     // Generate JSON report
     if (!args.skipJson) {

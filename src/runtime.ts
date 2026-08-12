@@ -43,7 +43,52 @@ export interface RuntimeOptions {
   rateLimitBaseMs: number;
   /** Minimum ms between consecutive requests. 0 disables pacing. */
   throttleMs: number;
+
+  /**
+   * Entity-name prefix on the HyperIndex side.
+   *
+   * A MERGED indexer namespaces every entity by its source subgraph
+   * (`Gauge` -> `Helper_Gauge`), so one endpoint can serve five migrations at
+   * once. The prefix has to reach three places or the run fails: the schema
+   * lookup that matches entities, the GraphQL query field, and — the one that
+   * is easy to miss — the RESPONSE KEY the result is read back out of. Getting
+   * the first two right and the third wrong yields `undefined` rows, which the
+   * diff faithfully reports as "every row is missing".
+   */
+  entityPrefix?: string;
+
+  /**
+   * Pin the HYPERINDEX side to a block, the asymmetric partner to `endBlock`.
+   *
+   * The subgraph has The Graph's `block: { number: N }` time-travel; a
+   * HyperIndex endpoint has nothing equivalent, so the only way to pin it is to
+   * filter on the entity's own block column. Without this, any row the indexer
+   * writes after the subgraph's pin shows up as pure `extra` with `0 missing` —
+   * a difference that is an artefact of the two sides being read at different
+   * heights, not a migration defect.
+   *
+   * Only usable on entities that HAVE a block column; mutable accumulators
+   * (Gauge, User, LiquidityPosition, ...) do not, and are trustworthy only when
+   * the indexer is stopped or caught up. Verify that at the end of every run.
+   */
+  hyperindexMaxBlock?: number;
+
 }
+
+/**
+ * User-Agent sent on every request, by both clients.
+ *
+ * Goldsky returns HTTP 403 to a request that carries no User-Agent, and
+ * graphql-request over Node's fetch sends none. An unset UA therefore makes
+ * every Goldsky subgraph look dead — a previous campaign recorded three live
+ * subgraphs as "disappeared" for exactly this reason.
+ *
+ * Deliberately a module constant rather than a RuntimeOptions field: the
+ * clients construct their GraphQLClient at import time, which runs BEFORE the
+ * CLI calls setRuntimeOptions(), so anything read from options there would
+ * silently be the default anyway.
+ */
+export const USER_AGENT = 'indexer-migration-validator/1.0 (+parity-check)';
 
 let options: RuntimeOptions = {
   retries: 5,
@@ -64,6 +109,18 @@ export function getRuntimeOptions(): RuntimeOptions {
 /** `"1776-"`, or undefined when not comparing a single chain. */
 export function chainPrefix(): string | undefined {
   return options.chainId === undefined ? undefined : `${options.chainId}-`;
+}
+
+/**
+ * The HyperIndex-side name for a subgraph entity: `Gauge` -> `Helper_Gauge`.
+ *
+ * Read through this everywhere rather than concatenating at the call site, so
+ * the query field and the response key cannot drift apart.
+ */
+export function hyperindexEntityName(subgraphEntityName: string): string {
+  return options.entityPrefix
+    ? `${options.entityPrefix}${subgraphEntityName}`
+    : subgraphEntityName;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { type EntityDiff, getSignificantMismatches, groupMismatchesById, type FieldMismatch } from '../comparators/diff.js';
+import { type EntityDiff, bucketFieldDiffs, getSignificantMismatches, groupMismatchesById, type FieldMismatch } from '../comparators/diff.js';
 
 // ANSI color codes
 const colors = {
@@ -102,6 +102,15 @@ export function printEntityDiff(diff: EntityDiff): void {
     ? ` (compared ${comparedCount} of ~${commonEst} common IDs)`
     : '';
   console.log(`  Compared: ${c('green', String(diff.matchedCount))} matched, ${c('yellow', String(diff.mismatchedCount))} with differences${c('dim', compareScope)}`);
+
+  // The three reported buckets, always printed so a clean entity is visibly
+  // clean at every magnitude rather than merely clean above 1%.
+  const b = bucketFieldDiffs(diff.fieldMismatches);
+  console.log(
+    `  Buckets: any=${b.differingAtAll} >0.1%=${b.overTenthPercent} >1%=${b.overOnePercent}` +
+      ` ulp=${b.ulp} non-numeric=${b.nonNumeric}` +
+      (diff.comparisonTruncated ? c('red', '  [TRUNCATED by --deep-limit]') : ''),
+  );
 
   // Suspected ID format mismatch
   if (diff.suspectedIdMismatch) {

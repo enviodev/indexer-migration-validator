@@ -55,6 +55,12 @@ export interface GeneratedEntityConfig {
   nestedFields: Record<string, string>;
   fieldMapping: Record<string, string>;
   knownIdMismatch: boolean;
+  /**
+   * HyperIndex column used to pin this entity to a block, when it has one.
+   * Absent for mutable accumulators, which carry no block column and therefore
+   * cannot be pinned — see RuntimeOptions.hyperindexMaxBlock.
+   */
+  blockField?: string;
 }
 
 export interface ConfigWarning {

@@ -1,9 +1,13 @@
 import { GraphQLClient } from 'graphql-request';
 import { SUBGRAPH_URL, getEntityConfigs } from '../config.js';
-import { getRuntimeOptions } from '../runtime.js';
+import { getRuntimeOptions, USER_AGENT } from '../runtime.js';
 import { requestWithRetry } from './request.js';
 
-const client = new GraphQLClient(SUBGRAPH_URL);
+// Goldsky 403s a request with no User-Agent; graphql-request sends none by
+// default. Without this header every Goldsky subgraph reads as dead.
+const client = new GraphQLClient(SUBGRAPH_URL, {
+  headers: { 'User-Agent': USER_AGENT },
+});
 
 /** graph-node caps `first` at 1000 on every host we target. */
 const PAGE_SIZE = 1000;

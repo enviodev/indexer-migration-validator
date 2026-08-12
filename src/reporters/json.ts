@@ -1,6 +1,18 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { type EntityDiff, getSignificantMismatches } from '../comparators/diff.js';
+import {
+  type EntityDiff,
+  type FieldDiffBreakdown,
+  bucketFieldDiffs,
+  getSignificantMismatches,
+} from '../comparators/diff.js';
+
+/**
+ * Cap on stored mismatch EXAMPLES per entity. Counts are always exact and come
+ * from the bucket breakdown; this only bounds the size of the evidence list so
+ * a 900k-row entity cannot produce an unopenable report.
+ */
+const MAX_STORED_EXAMPLES = 1000;
 
 export interface ComparisonReport {
   timestamp: string;
@@ -22,15 +34,23 @@ export interface EntityReport {
   hyperindexCount: number;
   matchedCount: number;
   mismatchedCount: number;
+  /** Rows actually field-compared. Less than subgraphCount when --deep-limit bit. */
+  comparedCount: number;
+  /** True when --deep-limit truncated the field comparison for this entity. */
+  comparisonTruncated: boolean;
   missingInHyperindex: string[];
   missingInSubgraph: string[];
-  fieldMismatches: Array<{
+  /** Exact bucket counts over ALL mismatches, overall and per field. */
+  fieldDiffs: FieldDiffBreakdown;
+  /** Evidence, capped at MAX_STORED_EXAMPLES. Counts live in fieldDiffs. */
+  fieldMismatchExamples: Array<{
     id: string;
     field: string;
     subgraphValue: unknown;
     hyperindexValue: unknown;
     diffPercent?: number;
   }>;
+  fieldMismatchExamplesTruncated: boolean;
 }
 
 /**
@@ -62,20 +82,44 @@ export function generateReport(diffs: EntityDiff[]): ComparisonReport {
       entitiesWithIssues++;
     }
 
+    // Bucket over ALL mismatches, not just the significant ones. The report
+    // previously stored only getSignificantMismatches(), which keeps non-numeric
+    // diffs and anything >= 1% and DISCARDS the rest — erasing the entire
+    // BigDecimal rounding class, the single largest category of difference in
+    // this migration, and making a "0 field mismatches" entity ambiguous
+    // between genuinely clean and clean-above-1%.
+    const fieldDiffs = bucketFieldDiffs(diff.fieldMismatches);
+
+    // Prefer the largest differences as evidence: if the list must be cut, the
+    // rows worth eyeballing are the ones that moved most, not the first 1000
+    // by id order.
+    // Non-numeric diffs rank first (no magnitude, always worth seeing), then by
+    // descending magnitude. Not a subtraction: two non-numeric diffs would give
+    // Infinity - Infinity = NaN, which is not a valid comparator result.
+    const rank = (p: number | undefined) => (p === undefined ? Infinity : p);
+    const ranked = [...diff.fieldMismatches].sort((a, b) => {
+      const [ra, rb] = [rank(a.diffPercent), rank(b.diffPercent)];
+      return ra === rb ? 0 : rb > ra ? 1 : -1;
+    });
+
     entities[diff.entityName] = {
       subgraphCount: diff.subgraphCount,
       hyperindexCount: diff.hyperindexCount,
       matchedCount: diff.matchedCount,
       mismatchedCount: diff.mismatchedCount,
+      comparedCount: diff.matchedCount + diff.mismatchedCount,
+      comparisonTruncated: diff.comparisonTruncated ?? false,
       missingInHyperindex: diff.missingInHyperindex,
       missingInSubgraph: diff.missingInSubgraph,
-      fieldMismatches: significantMismatches.map(m => ({
+      fieldDiffs,
+      fieldMismatchExamples: ranked.slice(0, MAX_STORED_EXAMPLES).map(m => ({
         id: m.id,
         field: m.field,
         subgraphValue: m.subgraphValue,
         hyperindexValue: m.hyperindexValue,
         diffPercent: m.diffPercent
-      }))
+      })),
+      fieldMismatchExamplesTruncated: ranked.length > MAX_STORED_EXAMPLES
     };
   }
 

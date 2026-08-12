@@ -9,6 +9,7 @@ import {
   Overrides,
 } from './types.js';
 import { getComparableFields } from './parser.js';
+import { hyperindexEntityName } from '../runtime.js';
 
 /**
  * Match entities between subgraph and hyperindex schemas
@@ -27,13 +28,18 @@ export function matchSchemas(
     // Skip non-entities and skipped entities
     if (!sgEntity.isEntity || skipEntities.has(name)) continue;
 
+    // On a MERGED endpoint the hyperindex side namespaces every entity by its
+    // source subgraph, so `Gauge` must resolve to `Helper_Gauge`. Try the
+    // prefixed name first; without a prefix configured this is just `name`.
+    const targetName = hyperindexEntityName(name);
+
     // Try exact name match first
-    let hiEntity = hyperindexSchema.entities.get(name);
+    let hiEntity = hyperindexSchema.entities.get(targetName);
 
     // If not found, try case-insensitive match
     if (!hiEntity) {
       for (const [hiName, entity] of hyperindexSchema.entities) {
-        if (hiName.toLowerCase() === name.toLowerCase()) {
+        if (hiName.toLowerCase() === targetName.toLowerCase()) {
           hiEntity = entity;
           break;
         }
@@ -82,8 +88,13 @@ export function matchSchemas(
     .filter(e => e.isEntity && !skipEntities.has(e.name) && !matches.some(m => m.subgraphEntity.name === e.name))
     .map(e => e.name);
 
+  // A merged schema holds every source indexer's entities at once, so without
+  // this filter a run against one source reports the other four's ~65 entities
+  // as "unmatched" — noise that buries a genuine unmatched entity.
+  const activePrefix = hyperindexEntityName('');
   const unmatchedHyperindex = [...hyperindexSchema.entities.keys()]
-    .filter(name => !matchedHyperindexNames.has(name));
+    .filter(name => !matchedHyperindexNames.has(name))
+    .filter(name => name.startsWith(activePrefix));
 
   return { matches, unmatchedSubgraph, unmatchedHyperindex };
 }

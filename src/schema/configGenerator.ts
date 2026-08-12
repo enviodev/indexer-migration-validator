@@ -1,6 +1,7 @@
 // Config Generator - generates EntityConfig from matched schemas
 import {
   ParsedSchema,
+  ParsedEntity,
   EntityMatch,
   GeneratedEntityConfig,
   ConfigWarning,
@@ -83,9 +84,14 @@ function generateEntityConfig(
 ): GeneratedEntityConfig {
   const { subgraphEntity, fieldMappings } = match;
 
-  // Generate query names
+  // Generate query names.
+  //
+  // The hyperindex name comes from the MATCHED entity, not from the subgraph
+  // name, because on a merged endpoint they differ (`Gauge` -> `Helper_Gauge`).
+  // Deriving it from the subgraph name instead would silently query a field
+  // that does not exist.
   const subgraphName = toSubgraphQueryName(subgraphEntity.name);
-  const hyperindexName = subgraphEntity.name; // HyperIndex uses PascalCase singular
+  const hyperindexName = match.hyperindexEntity.name;
 
   // Separate direct fields from nested fields and renamed fields
   const fields: string[] = [];
@@ -120,14 +126,39 @@ function generateEntityConfig(
   const hasKnownIdMismatch = knownIdMismatch.has(subgraphEntity.name) ||
     (!idMatchConfirmed.has(subgraphEntity.name) && detectIdMismatch(subgraphEntity.name));
 
+  const blockField = detectBlockField(match.hyperindexEntity);
+
   return {
     subgraphName,
     hyperindexName,
     fields,
     nestedFields,
     fieldMapping,
-    knownIdMismatch: hasKnownIdMismatch
+    knownIdMismatch: hasKnownIdMismatch,
+    ...(blockField ? { blockField } : {})
   };
+}
+
+/**
+ * The column to pin the HyperIndex side on, if the entity has one.
+ *
+ * Order matters. `blockNumber` is the block the row was WRITTEN at, so it pins
+ * exactly. `createdAtBlockNumber` only pins the row's EXISTENCE — a row created
+ * before the pin keeps mutating afterwards — but that is still enough to stop
+ * post-pin rows appearing as spurious `extra`, which is what this filter is
+ * for. Entities with neither are mutable accumulators and cannot be pinned at
+ * all; they are only trustworthy against a stopped or caught-up indexer.
+ */
+function detectBlockField(hiEntity: ParsedEntity): string | undefined {
+  const candidates = ['blockNumber', 'block', 'createdAtBlockNumber', 'createdAtBlock'];
+  const byName = new Map(hiEntity.fields.map(f => [f.name, f]));
+  for (const candidate of candidates) {
+    const field = byName.get(candidate);
+    // Must be a scalar number we can compare against; a relation named `block`
+    // would produce `{_lte: N}` against an object column and fail the query.
+    if (field && !field.isRelation && !field.isArray) return candidate;
+  }
+  return undefined;
 }
 
 /**
