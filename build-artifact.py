@@ -218,7 +218,7 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
 .lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .mast h1{font-size:clamp(30px,4.4vw,46px);line-height:1.1;letter-spacing:-.015em;margin:.35em 0 .3em;font-weight:600}
 .mast .sub{color:var(--muted);font-size:19px;max-width:60ch;margin:0}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:1px;
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;
   background:var(--rule);border:1px solid var(--rule);border-radius:3px;margin-top:32px;overflow:hidden}
 .fact{background:var(--panel-2);padding:13px 16px}
 .fact dt{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
@@ -333,6 +333,7 @@ code{font-size:.87em;background:var(--panel-2);border:1px solid var(--rule-soft)
 
 footer{padding:44px 0 60px;color:var(--muted);font-size:14px}
 footer p{max-width:74ch;margin:0 0 .7em}
+@media (max-width:820px){ .facts{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:640px){
   .wrap{padding:0 18px} body{font-size:16px}
   .dep{padding:20px 16px 6px} .tw{margin:16px -16px 0;padding:0 16px}
@@ -373,11 +374,14 @@ LEADS = {
  "farm-239": '<p class="lead">Row-for-row exact. The single field difference is a defect in the '
    '<em>subgraph</em>, not in the migration — proven against the chain in '
    '<a href="#case-farm">case&nbsp;5</a>.</p>',
- "helper-59144": '<p class="lead">The biggest single table in the campaign. This subgraph publishes only '
-   '11 of the 26 <code>Helper_</code> entity types — the ve/points family, <code>Block</code>, '
-   '<code>GaugeState</code> and <code>Harvest</code> are absent from the Linea deployment, so they are '
-   'out of scope here rather than missing.</p>',
- "helper-9745": "",
+ "helper-59144": '<p class="lead">The largest helper deployment &mdash; 916,814 rows reconciling '
+   'exactly, with nothing missing on either side. This subgraph publishes only 11 of the 26 '
+   '<code>Helper_</code> entity types: the ve/points family, <code>Block</code>, <code>GaugeState</code> '
+   'and <code>Harvest</code> are absent from the Linea deployment, so they are out of scope here rather '
+   'than missing. All 179 field differences sit on a single dust column.</p>',
+ "helper-9745": '<p class="lead">Row-for-row exact. Every field difference is on one column, '
+   '<code>DepositTokenBalance.amountDecimals</code>, and every one is dust &mdash; see the caveat on '
+   'percentage buckets above.</p>',
  "helper-4663": '<p class="lead">Both sides are internally consistent and completely disjoint: every id '
    'differs, and among the rows that do line up there is not one field difference. That is the signature '
    'of two correct indexers pointed at <em>different contracts</em> — '
@@ -397,6 +401,8 @@ REASONS = {
  ("helper-4663","Block"): 'disjoint id sets, wrong <code>VeToken</code> &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
  ("helper-4663","VeToken"): 'different contract address &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
  ("helper-4663","VeTokenSnapshot"): 'disjoint id sets, wrong <code>VeToken</code> &mdash; <a href="#case-vetoken">case&nbsp;2</a>',
+ ("helper-59144","DepositTokenBalance"): 'rounding &mdash; dust vs 0, largest absolute '
+   '1.0&times;10<sup>-28</sup> tokens (<a href="#case-ulp">case&nbsp;1</a>)',
  ("helper-9745","DepositTokenBalance"): 'rounding &mdash; every difference is dust vs exactly 0, '
    'largest absolute 1.4&times;10<sup>-28</sup> tokens (<a href="#case-ulp">case&nbsp;1</a>)',
 
@@ -669,6 +675,13 @@ the &gt;&nbsp;0.1&nbsp;% or &gt;&nbsp;1&nbsp;% buckets, because calling them 0&n
 them and 100&nbsp;% would invent a number. Across the whole campaign there are none: every field
 difference found is numeric.</p>
 
+<p><strong>The validator's own numbers were cross-checked.</strong> All 19 entity row counts on
+helper/1776 were re-derived by direct GraphQL pagination against both endpoints, through a separate
+code path that shares nothing with the validator beyond the URLs. All 19 agree on both sides, with
+zero mismatches. The 29-hour gap in <a href="#case-swap">case&nbsp;6</a> was likewise established by
+direct queries rather than from the validator's output, and every on-chain claim in cases&nbsp;5
+and&nbsp;6 was verified against the chain by <code>eth_getLogs</code>.</p>
+
 <div class="banner"><p><strong>One caveat on the percentage buckets.</strong> A relative difference
 is meaningless when the baseline is itself dust. On helper/9745, 17 differences exceed 1&nbsp;%
 relative &mdash; but every one is the subgraph holding a residue near
@@ -690,9 +703,15 @@ PRIOR = {
  "v1-4663":      ("36 / 36", "0", "agree"),
  "farm-239":     ("917 / 917", "0", "differ"),
  "analytics-239":("27 entities", "8 entities ULP-only", "differ"),
+ "helper-59144": ("916,789 / 916,789", "1,627 *Decimals ULP", "differ"),
 }
 
 RECON_NOTES = {
+ "helper-59144": "The &sect;6 figure is the <em>standalone</em> indexer baseline, not a merged run. Rows "
+   "reconcile exactly here (916,814 on both sides, 25 more than the standalone baseline, consistent with "
+   "the later pin). The difference count is lower because this run field-compares 10,000 rows per entity "
+   "rather than every row; the class is unchanged &mdash; one dust column, largest absolute difference "
+   "1.0&times;10<sup>-28</sup> tokens.",
  "v1-59144": "Not comparable as totals, and better now. &sect;6's own note says <code>Transaction</code> "
    "and <code>Swap</code> were <em>not yet compared</em> on Linea; this run includes both &mdash; "
    "1,274,386 swaps and 1,119,956 transactions &mdash; and finds them exact. All 16 entities reconcile "
