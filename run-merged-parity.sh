@@ -22,7 +22,9 @@ set -o pipefail
 
 cd "$(dirname "$0")"
 
-HYPERINDEX_URL='https://indexer.dev.hyperindex.xyz/2a5ef57/v1/graphql'
+# Override per run: the endpoint changes with every redeploy, and every
+# redeploy re-indexes from scratch.
+HYPERINDEX_URL="${HYPERINDEX_URL:-https://indexer.dev.hyperindex.xyz/8f7107f/v1/graphql}"
 MERGED_SCHEMA='./pumex-merged/hyperindex-schema.graphql'
 GOLDSKY='https://api.goldsky.com/api/public/project_cltyhthusbmxp01s95k9l8a1u/subgraphs'
 ORMI='https://api.subgraph.ormilabs.com/api/public/414271d5-5c72-4403-ac1e-fabd86621904/subgraphs'
@@ -45,9 +47,38 @@ TARGETS=(
 
 mkdir -p "$OUTDIR"
 
+# Per-chain pins, read from the deployment itself rather than hardcoded. A
+# hardcoded pin silently becomes wrong the moment the indexer is redeployed or
+# resumes advancing, and the failure mode is that the subgraph's newer rows all
+# read as "missing in envio".
+echo "Reading pins from $HYPERINDEX_URL ..."
+PINS_JSON=$(curl -s -X POST "$HYPERINDEX_URL" \
+  -H 'content-type: application/json' -H 'User-Agent: parity/1.0' \
+  --data '{"query":"{ chain_metadata { chain_id latest_processed_block } }"}')
+pin_for() {
+  echo "$PINS_JSON" | python3 -c "
+import json,sys
+cid=int(sys.argv[1])
+d=json.load(sys.stdin)
+for r in d['data']['chain_metadata']:
+    if r['chain_id']==cid: print(r['latest_processed_block']); break
+else: print('')
+" "$1"
+}
+
 selected=("$@")
 for spec in "${TARGETS[@]}"; do
-  IFS='|' read -r name url sgschema overrides prefix chain pin <<< "$spec"
+  IFS='|' read -r name url sgschema overrides prefix chain staticpin <<< "$spec"
+
+  # Chain-239-only targets carry no --chain, so derive the pin chain from the
+  # target name instead.
+  pinchain="$chain"
+  [ "$pinchain" = "-" ] && pinchain="${name##*-}"
+  pin=$(pin_for "$pinchain")
+  if [ -z "$pin" ]; then
+    echo "!! no pin for chain $pinchain on this deployment; skipping $name"
+    continue
+  fi
 
   if [ ${#selected[@]} -gt 0 ]; then
     match=0
