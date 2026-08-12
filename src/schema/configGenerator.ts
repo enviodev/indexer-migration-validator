@@ -22,6 +22,7 @@ export function generateConfigs(
   const matchResult = matchSchemas(subgraphSchema, hyperindexSchema, overrides);
   const configs: Record<string, GeneratedEntityConfig> = {};
   const warnings: ConfigWarning[] = [];
+  const unmappedSubgraphFields: Record<string, string[]> = {};
 
   const knownIdMismatchSet = new Set(overrides?.knownIdMismatch || []);
   const idMatchConfirmedSet = new Set(overrides?.idMatchConfirmed || []);
@@ -29,6 +30,10 @@ export function generateConfigs(
   for (const match of matchResult.matches) {
     const config = generateEntityConfig(match, knownIdMismatchSet, idMatchConfirmedSet);
     configs[match.subgraphEntity.name] = config;
+
+    if (match.unmappedSubgraphFields.length > 0) {
+      unmappedSubgraphFields[match.subgraphEntity.name] = match.unmappedSubgraphFields;
+    }
 
     // Generate warnings
     if (match.confidence < 0.8) {
@@ -70,7 +75,8 @@ export function generateConfigs(
     configs,
     warnings,
     unmatchedSubgraphEntities: matchResult.unmatchedSubgraph,
-    unmatchedHyperindexEntities: matchResult.unmatchedHyperindex
+    unmatchedHyperindexEntities: matchResult.unmatchedHyperindex,
+    unmappedSubgraphFields
   };
 }
 

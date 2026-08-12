@@ -1,0 +1,226 @@
+# GENERATED from the live subgraph by `introspect-subgraph.ts`.
+# Do not hand-edit — regenerate instead.
+# Source: https://api.goldsky.com/api/public/project_cltyhthusbmxp01s95k9l8a1u/subgraphs/orvex-helper/1.0.1/gn
+#
+# Relations stay object-typed so the matcher can map them onto the
+# hyperindex `<name>_id` column. List-of-entity fields are kept so they show
+# up as UNCOMPARED rather than vanishing from the report.
+
+type Block @entity {
+  id: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+}
+
+type DepositTokenBalance @entity {
+  id: ID!
+  user: User!
+  token: Token!
+  amount: BigInt!
+  amountDecimals: BigDecimal!
+}
+
+type Exercise @entity {
+  id: ID!
+  sender: Bytes!
+  recipient: Bytes!
+  amount: BigInt!
+  paymentAmount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type ExerciseVe @entity {
+  id: ID!
+  sender: Bytes!
+  recipient: Bytes!
+  amount: BigInt!
+  paymentAmount: BigInt!
+  nftId: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Gauge @entity {
+  id: ID!
+  state: GaugeState!
+  gauge: Bytes!
+  creator: Bytes!
+  internalBribe: Bytes!
+  externalBribe: Bytes!
+  pool: Bytes!
+  token0: Token!
+  token1: Token!
+  liquidityProviderCount: BigInt!
+  deposits: [GaugeDeposit!]!
+  withdrawals: [GaugeWithdraw!]!
+  liquidityPositions: [LiquidityPosition!]!
+  liquidityPositionSnapshots: [LiquidityPositionSnapshot!]!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GaugeCreated @entity {
+  id: Bytes!
+  gauge: Bytes!
+  creator: Bytes!
+  internalBribe: Bytes!
+  externalBribe: Bytes!
+  pool: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GaugeDeposit @entity {
+  id: Bytes!
+  gauge: Gauge!
+  user: Bytes!
+  pool: Bytes
+  amount: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GaugeState @entity {
+  id: ID!
+  gauges: [Gauge!]!
+}
+
+type GaugeWithdraw @entity {
+  id: Bytes!
+  gauge: Gauge!
+  user: Bytes!
+  pool: Bytes
+  amount: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Harvest @entity {
+  id: Bytes!
+  receiver: User!
+  gauge: Gauge!
+  tokenAddress: Bytes!
+  rewardAmount: BigInt!
+  rewardAmountDecimals: BigDecimal!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type LiquidityPosition @entity {
+  id: ID!
+  user: User!
+  gauge: Gauge!
+  amount: BigInt!
+  userShare: BigDecimal!
+  userToken0: BigInt!
+  userToken1: BigInt!
+  userToken0Decimals: BigDecimal!
+  userToken1Decimals: BigDecimal!
+  reserve0: BigInt!
+  reserve1: BigInt!
+  liquidityTokenTotalSupply: BigInt!
+  shareSecondsTotal: BigDecimal!
+  amountSecondsTotal: BigDecimal!
+  lastAccruedAt: BigInt!
+}
+
+type LiquidityPositionSnapshot @entity {
+  id: ID!
+  liquidityPosition: LiquidityPosition!
+  gauge: Gauge!
+  user: User!
+  amount: BigInt!
+  userShare: BigDecimal!
+  userToken0: BigInt!
+  userToken1: BigInt!
+  userToken0Decimals: BigDecimal!
+  userToken1Decimals: BigDecimal!
+  reserve0: BigInt!
+  reserve1: BigInt!
+  liquidityTokenTotalSupply: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  deltaSeconds: BigInt!
+  deltaShareSeconds: BigDecimal!
+  deltaAmountSeconds: BigDecimal!
+}
+
+type Token @entity {
+  id: ID!
+  symbol: String!
+  name: String!
+  decimals: BigInt!
+  totalSupply: BigInt!
+}
+
+type User @entity {
+  id: ID!
+  liquidityPositions: [LiquidityPosition!]
+  depositTokenBalance: [DepositTokenBalance!]
+  harvests: [Harvest!]
+  shareSecondsTotal: BigDecimal!
+  amountSecondsTotal: BigDecimal!
+  pointsUpdatedAt: BigInt!
+}
+
+type VeLock @entity {
+  id: ID!
+  veToken: VeToken!
+  user: VeUser!
+  owner: Bytes!
+  value: BigInt!
+  startTime: BigInt!
+  endTime: BigInt!
+  isPermanent: Boolean!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  burned: Boolean!
+}
+
+type VeToken @entity {
+  id: ID!
+  tokenAddress: Bytes!
+  name: String!
+  symbol: String!
+  decimals: BigInt!
+  totalSupply: BigInt!
+  totalLocked: BigInt!
+  locks: [VeLock!]!
+  snapshots: [VeTokenSnapshot!]!
+}
+
+type VeTokenSnapshot @entity {
+  id: ID!
+  veToken: VeToken!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  totalSupply: BigInt!
+  totalLocked: BigInt!
+}
+
+type VeUser @entity {
+  id: ID!
+  totalLocked: BigInt!
+  totalVotingPower: BigInt!
+  lockCount: BigInt!
+  locks: [VeLock!]!
+  deltas: [VeUserLockDelta!]!
+}
+
+type VeUserLockDelta @entity {
+  id: Bytes!
+  user: VeUser!
+  tokenId: BigInt!
+  delta: BigInt!
+  reason: String!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

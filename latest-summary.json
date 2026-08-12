@@ -1,0 +1,504 @@
+o indexer-migration-validator % pnpm compare --deep
+
+> indexer-migration-validator@1.0.0 compare /Users/kenauvith/Documents/Dev-Projects/indexer-migration-validator
+> tsx src/index.ts --deep
+
+Loaded overrides from: ./overrides.json
+Parsing subgraph schema: ./v1-subgraph-schema.graphql
+Parsing hyperindex schema: ./v1-hyperindex-schema.graphql
+Subgraph: 17 entities, 0 enums
+HyperIndex: 18 entities
+
+Generated 17 entity configs
+
+Warnings:
+  [low_confidence] LiquidityPosition: Only 50% of fields matched (2 unmapped)
+  [low_confidence] LiquidityPositionSnapshot: Only 77% of fields matched (3 unmapped)
+  [low_confidence] Transaction: Only 73% of fields matched (3 unmapped)
+
+Unmatched HyperIndex Entities: PairTokenLookup
+
+Loaded 17 entity configs from schemas
+
+===========================================
+Subgraph vs HyperIndex Comparison
+===========================================
+Entities: 17
+Mode: DEEP (full comparison)
+
+[DEEP] Comparing UniswapFactory...
+  Fetching all IDs from Subgraph... 1 Done (1)
+  Fetching all IDs from HyperIndex... 1 Done (1)
+  Common: 0, Missing in HyperIndex: 1, Missing in Subgraph: 1
+
+=== UniswapFactory ===
+  Records: Subgraph=1, HyperIndex=1
+  Compared: 0 matched, 0 with differences
+  Missing in HyperIndex: 1
+    - 0x71f6b49ae1558357bBb5A6074f1143c46cBcA03d
+  Missing in Subgraph: 1
+    - 0x71f6b49ae1558357bbb5a6074f1143c46cbca03d
+
+[DEEP] Comparing Token...
+  Fetching all IDs from Subgraph... 3580 Done (3580)
+  Fetching all IDs from HyperIndex... 3580 Done (3580)
+  Common: 3580, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Fetching 3580 records from Subgraph... 3580/3580 Done
+  Fetching 3580 records from HyperIndex... 3580/3580 Done
+
+=== Token ===
+  Records: Subgraph=3580, HyperIndex=3580
+  Compared: 0 matched, 3580 with differences
+  Field Mismatches: 3842
+    0x000e8c0866606e382f78ef0a73855cd6cbc908ff:
+      totalSupply: "16328" vs "100000000000000000000000000000" (6.124448799608035e+26% diff)
+    0x00182c75f8282839818ce1260120f89caf29ed27:
+      totalSupply: "16328" vs "0" (100% diff)
+    0x00504d1db3e3288fa4b1c2f604425fbd69709b22:
+      totalSupply: "16328" vs "100000000000000000000000000000" (6.124448799608035e+26% diff)
+    0x005db4b2ca08808c2699733f5ec7390978851221:
+      totalSupply: "16328" vs "0" (100% diff)
+    0x006cc7831148d4c613dc6a2f051a09d46d72118a:
+      totalSupply: "16328" vs "100000000000000000000000000000" (6.124448799608035e+26% diff)
+    ... and 3575 more IDs with mismatches
+
+[DEEP] Comparing Pair...
+  Fetching all IDs from Subgraph... 3711 Done (3711)
+  Fetching all IDs from HyperIndex... 3711 Done (3711)
+  Common: 3711, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Fetching 3711 records from Subgraph... 3711/3711 Done
+  Fetching 3711 records from HyperIndex... 3711/3711 Done
+
+=== Pair ===
+  Records: Subgraph=3711, HyperIndex=3711
+  Compared: 1890 matched, 1821 with differences
+  Field Mismatches: 352
+    0x01392356d14192d03ead6e22bf749bd8b7b13660:
+      untrackedVolumeUSD: "0.0035835497377191304322942..." vs "0.0071670994754382608645687..." (100% diff)
+    0x0166489ecf4004d578cf916cb562067d7d4c1d21:
+      token0Price: "0.0000000000000000000000000..." vs "0" (100% diff)
+      untrackedVolumeUSD: "290.38079983440679695308564..." vs "580.76159966881359389100395..." (100% diff)
+    0x01cf68378d9bc058ef6630840a32572c85a307bf:
+      untrackedVolumeUSD: "0.0003596733926705115170921..." vs "0.0007193467853410230341829..." (100% diff)
+    0x027031462ccf336c63a1a7efbb7a742bbe353fe1:
+      volumeUSD: "2767.5979967807976763368003..." vs "1621.9366519452727186122287..." (41.4% diff)
+      liquidityProviderCount: "5" vs "4" (20% diff)
+    0x02b6c11a8304d008dda239da0917cd7489262f47:
+      liquidityProviderCount: "6" vs "5" (16.67% diff)
+    ... and 318 more IDs with mismatches
+
+[DEEP] Comparing User...
+  Fetching all IDs from Subgraph... 16117 Done (16117)
+  Fetching all IDs from HyperIndex... 16117 Done (16117)
+  Common: 16117, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Limiting to 10000 records (of 16117 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== User ===
+  Records: Subgraph=16117, HyperIndex=16117
+  Compared: 10000 matched, 0 with differences
+  Status: All records match!
+
+[DEEP] Comparing LiquidityPosition...
+  Fetching all IDs from Subgraph... 23241 Done (23241)
+  Fetching all IDs from HyperIndex... 23174 Done (23174)
+  Common: 23174, Missing in HyperIndex: 67, Missing in Subgraph: 0
+  Limiting to 10000 records (of 23174 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== LiquidityPosition ===
+  Records: Subgraph=23241, HyperIndex=23174
+  Compared: 9753 matched, 247 with differences
+  Missing in HyperIndex: 67
+    - 0x027031462ccf336c63a1a7efbb7a742bbe353fe1-0x0000000000000000000000000000000000000000
+    - 0x02b6c11a8304d008dda239da0917cd7489262f47-0x0000000000000000000000000000000000000000
+    - 0x071a4db74e7a449b26189086cdc077fe41dfea44-0x0000000000000000000000000000000000000000
+    ... and 64 more
+  Field Mismatches: 247
+    0x0a1b6b4b54660be0146f2272d00729bb50e6baa6-0xfec4fa7d245c2588686483c8246d5d308cab8c74:
+      liquidityTokenBalance: "68.965573547306486633" vs "0" (100% diff)
+    0x0fea70c1779970d6f7e28476a8c47795ee3d6f43-0x2f8a29c1d12c71d6e2e175f91931d271ea7bf008:
+      liquidityTokenBalance: "0.0000000000014" vs "0" (100% diff)
+    0x1164cb64477dc06d533c4d8905d76adeb5adbb94-0x95cac40480c27ba013d92598f7e849640f1d204a:
+      liquidityTokenBalance: "0.000000003681157594" vs "0" (100% diff)
+    0x1546c209b3c4ee5e79c3de3f674d21b5350940d9-0x000000000000000000000000000000000000dead:
+      liquidityTokenBalance: "223606.797749978969639917" vs "0" (100% diff)
+    0x192a3bbf1c9bfa8c96204e7ab9e0f2e5900bb43e-0xfec4fa7d245c2588686483c8246d5d308cab8c74:
+      liquidityTokenBalance: "91420.934500468213275951" vs "0" (100% diff)
+    ... and 242 more IDs with mismatches
+
+[DEEP] Comparing LiquidityPositionSnapshot...
+  Fetching all IDs from Subgraph... 101000[Subgraph] Hit 100k limit for LiquidityPositionSnapshot
+ Done (101000)
+  Fetching all IDs from HyperIndex... 101000[HyperIndex] Hit 100k limit for LiquidityPositionSnapshot
+ Done (101000)
+  Common: 100945, Missing in HyperIndex: 55, Missing in Subgraph: 55
+  Limiting to 10000 records (of 100945 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== LiquidityPositionSnapshot ===
+  Records: Subgraph=101000, HyperIndex=101000
+  Compared: 0 matched, 10000 with differences
+  Missing in HyperIndex: 55
+    - 0x027031462ccf336c63a1a7efbb7a742bbe353fe1-0x00000000000000000000000000000000000000001727368907
+    - 0x02b6c11a8304d008dda239da0917cd7489262f47-0x00000000000000000000000000000000000000001733367355
+    - 0x071a4db74e7a449b26189086cdc077fe41dfea44-0x00000000000000000000000000000000000000001750873012
+    ... and 52 more
+  Missing in Subgraph: 55
+    - 0x8ba502d9243fa5e44678044098be9782cebafda5-0x23f5d21f49ba624e5d04408de6f385d525b631231726764859
+    - 0x8ba502d9243fa5e44678044098be9782cebafda5-0x25874a00cc2d3ff398254db2af05bfbd1b3ba5cc1726764859
+    - 0x8d5261cff8d63e71c772574eba63e64e6726ee06-0x8ea6527e9c6a06f0f87781f629dbe8994f18e9291727106325
+    ... and 52 more
+  Field Mismatches: 9699
+    0x0041affb896ad5293d734a3608f548c260fda051-0xc4b8bce8b68ad8a53a0416ce8c5e7c1f9ab843ea1771853909:
+      reserve0: "10000000" vs "0" (100% diff)
+      reserve1: "10" vs "0" (100% diff)
+      reserveUSD: "0.6841262546955250103692425..." vs "0" (100% diff)
+      liquidityTokenBalance: "9999.999999999999999" vs "0" (100% diff)
+    0x0041affb896ad5293d734a3608f548c260fda051-0xfec4fa7d245c2588686483c8246d5d308cab8c741771937925:
+      liquidityTokenBalance: "0.569233197566518547" vs "0" (100% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-0x0e8e0ef6c3383f2d28efda6e862a7e9b11f6d3d81741023740:
+      liquidityTokenBalance: "6518.760250231634342351" vs "0" (100% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-0x0e8e0ef6c3383f2d28efda6e862a7e9b11f6d3d81773034613:
+      liquidityTokenBalance: "3259.380125115817171176" vs "0" (100% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-0x0e8e0ef6c3383f2d28efda6e862a7e9b11f6d3d81773034669:
+      liquidityTokenBalance: "1629.690062557908585588" vs "0" (100% diff)
+    ... and 6994 more IDs with mismatches
+
+[DEEP] Comparing Transaction...
+  Fetching all IDs from Subgraph... 101000[Subgraph] Hit 100k limit for Transaction
+ Done (101000)
+  Fetching all IDs from HyperIndex... 85000[HyperIndex] Error fetching Transaction IDs: connection error
+  Fetching all IDs from HyperIndex... 85000 Done (85000)
+  Common: 84999, Missing in HyperIndex: 16001, Missing in Subgraph: 1
+  Limiting to 10000 records (of 84999 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== Transaction ===
+  Records: Subgraph=101000, HyperIndex=85000
+  Compared: 9898 matched, 102 with differences
+  Missing in HyperIndex: 16001
+    - 0x018c946d9db49149e5cca9ec7ff489b07a9e8cbf07f42c67ee34f35ef4641606
+    - 0x038b1429468fd6d70e109ea37c32d0d3a257b6f014e1d05767d078a963241947
+    - 0x06cc69d8bc514ff0666be962ee3b6623e162ca50ecc3632fae3d7c2f67238b99
+    ... and 15998 more
+  Missing in Subgraph: 1
+    - 0x008a71916aa01153279dc21b14cb645c169b341cd9f0feb3343ba7065f9f878e
+  Field Mismatches: 102
+    0x0001082e3a4923edf5111ebf57fdcea2a1c97d2d4f898a0159c2c5734042b775:
+      mintCount: "1" vs "0" (100% diff)
+    0x00011edbd393c1fddc81e3b16610ce845474bf468cc641d95f2db032526d1816:
+      mintCount: "1" vs "0" (100% diff)
+    0x0005a5d3eeca2a0bc66a7be9fb5d3d1bceffc99c8e00cc1780210ea48cb7ccd3:
+      mintCount: "1" vs "0" (100% diff)
+    0x00072e18495c5d5f8c4258af5ebf7b1c6916ea21f56247e98f13001f2a75c76e:
+      mintCount: "1" vs "0" (100% diff)
+    0x000870c7c98ca278b9456f8a3dd63dc4689ba110b5ef75b527027ee261f57b69:
+      mintCount: "1" vs "0" (100% diff)
+    ... and 97 more IDs with mismatches
+
+[DEEP] Comparing PairTransfer...
+  Fetching all IDs from Subgraph... 101000[Subgraph] Hit 100k limit for PairTransfer
+ Done (101000)
+  Fetching all IDs from HyperIndex... 101000[HyperIndex] Hit 100k limit for PairTransfer
+ Done (101000)
+  Common: 100994, Missing in HyperIndex: 6, Missing in Subgraph: 8
+  Limiting to 10000 records (of 100994 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== PairTransfer ===
+  Records: Subgraph=101000, HyperIndex=101000
+  Compared: 10000 matched, 0 with differences
+  Missing in HyperIndex: 6
+    - 0xb2d2494bdd1ae794d208adb66445748a68922b299927eb815c404e519a63be830xc75c669a62a7ece0c8d37904b747970467432ad30xc75c669a62a7ece0c8d37904b747970467432ad30x66bd05c0xfec4fa7d245c2588686483c8246d5d308cab8c74
+    - 0xb2d2b097b4c05d7894cb38bfb9e135eef4edb8ae84a0b4af2a0f7731274622340x8ba502d9243fa5e44678044098be9782cebafda50x8ba502d9243fa5e44678044098be9782cebafda50x58ca5520x972377471f229ec94cbb3c10d615f4b571420e21
+    - 0xb2d3202307f8efd1ce8c0dc931b11c7e107006809ca76cbc5a013a8491794feb0x8ba502d9243fa5e44678044098be9782cebafda50x8ba502d9243fa5e44678044098be9782cebafda50x746a92b0x0000000000000000000000000000000000000000
+    ... and 3 more
+  Missing in Subgraph: 8
+    - 0x1543cffbc9fb47f38a10522e335c4b18f46ffc4bd0bc91e6364d84268c56bac80xc75c669a62a7ece0c8d37904b747970467432ad30xc75c669a62a7ece0c8d37904b747970467432ad30x632e39a0x4f7d341328a3f3fdd36324ba146e80ad1055419d
+    - 0x32fe0c3b1e6ecb7e33264e6de43528661350ac0ac5ef4ddea3c82bce593922c70x8d5261cff8d63e71c772574eba63e64e6726ee060x8d5261cff8d63e71c772574eba63e64e6726ee060x632e3f10x0000000000000000000000000000000000000000
+    - 0x32fe0c3b1e6ecb7e33264e6de43528661350ac0ac5ef4ddea3c82bce593922c70x8d5261cff8d63e71c772574eba63e64e6726ee060x8d5261cff8d63e71c772574eba63e64e6726ee060x632e3f10x8d5261cff8d63e71c772574eba63e64e6726ee06
+    ... and 5 more
+
+[DEEP] Comparing Mint...
+  Fetching all IDs from Subgraph... 34525 Done (34525)
+  Fetching all IDs from HyperIndex... 34525 Done (34525)
+  Common: 34524, Missing in HyperIndex: 1, Missing in Subgraph: 1
+  Limiting to 10000 records (of 34524 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== Mint ===
+  Records: Subgraph=34525, HyperIndex=34525
+  Compared: 12 matched, 9988 with differences
+  Missing in HyperIndex: 1
+    - 0xdf1ed8be34364e77414576e466f231297751c31efb59cde3e2e68cf2fd0e0abb-0
+  Missing in Subgraph: 1
+    - 0x8f3fec522e1d77cd03e7430438127f321feab35f8d43b1c6225ba2617ad162bd-0
+  Field Mismatches: 1994
+    0x0001082e3a4923edf5111ebf57fdcea2a1c97d2d4f898a0159c2c5734042b775-0:
+      logIndex: "5" vs "48" (860% diff)
+    0x000b687b156922976b65f5d6fc54d5f5efa07cdb0f357027174eb32f240be0aa-0:
+      logIndex: "6" vs "11" (83.33% diff)
+    0x001211dc01dc07da58aa140653519cc42cde57b909dc3ffb5b9db96a51aabcb4-0:
+      logIndex: "5" vs "36" (620% diff)
+    0x001bd015fb3dc82105d196215798f6454bac4337858808ee0bcd925ac4ecd67b-0:
+      logIndex: "6" vs "10" (66.67% diff)
+    0x004398f67d6aa0f90c449bdc9f9c9e6ce772e577debef87b8b471bbb3c7faadb-0:
+      logIndex: "6" vs "10" (66.67% diff)
+    ... and 1987 more IDs with mismatches
+
+[DEEP] Comparing Burn...
+  Fetching all IDs from Subgraph... 22550 Done (22550)
+  Fetching all IDs from HyperIndex... 22551 Done (22551)
+  Common: 22550, Missing in HyperIndex: 0, Missing in Subgraph: 1
+  Limiting to 10000 records (of 22550 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== Burn ===
+  Records: Subgraph=22550, HyperIndex=22551
+  Compared: 0 matched, 10000 with differences
+  Missing in Subgraph: 1
+    - 0x32fe0c3b1e6ecb7e33264e6de43528661350ac0ac5ef4ddea3c82bce593922c7-0
+  Field Mismatches: 22548
+    0x00026589b9a46b00f13b4e712617a648b87d06f681f77e738d66916c5e6f901b-0:
+      to: "0xe7fef2854ac5b89f116d1d8e9..." vs "0x0000000000000000000000000..."
+      needsComplete: true vs false
+    0x00064d2cf25274399ff7db135b823bc629ad032bd5778c6b3f18e3748d2e5c9c-0:
+      to: "0x8ba502d9243fa5e4467804409..." vs "0x0000000000000000000000000..."
+      needsComplete: true vs false
+    0x000bd86dfaef2ecb6c222979e86f41c45ee5106c3b37b4620a8f995843558666-0:
+      to: "0x0a1b6b4b54660be0146f2272d..." vs "0x0000000000000000000000000..."
+      needsComplete: true vs false
+    0x000c681e4a33a3285c8484e762ee92f4695f3b8dc542fd767920db02ad091833-0:
+      to: "0x6f695e89f17ab7476ea9cdd4d..." vs "0x0000000000000000000000000..."
+      logIndex: "7" vs "30" (328.57% diff)
+      needsComplete: true vs false
+    0x00116c46edc95a8cd2116e4b3f41805347a653d8873ea71ded4ef4f4dd384aa8-0:
+      to: "0x8ba502d9243fa5e4467804409..." vs "0x0000000000000000000000000..."
+      needsComplete: true vs false
+    ... and 9995 more IDs with mismatches
+
+[DEEP] Comparing Swap...
+  Skipping - known ID format mismatch (configure in overrides.json)
+
+=== Swap ===
+  Records: Subgraph=0, HyperIndex=0
+  Compared: 0 matched, 0 with differences
+  Status: All records match!
+
+[DEEP] Comparing Bundle...
+  Fetching all IDs from Subgraph... 1 Done (1)
+  Fetching all IDs from HyperIndex... 1 Done (1)
+  Common: 1, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Fetching 1 records from Subgraph... 1/1 Done
+  Fetching 1 records from HyperIndex... 1/1 Done
+
+=== Bundle ===
+  Records: Subgraph=1, HyperIndex=1
+  Compared: 0 matched, 1 with differences
+  Sample differences (below 1% threshold, 1 total):
+    1:
+      ethPrice: "0.0658276325975431417518469..." vs "0.0658276325975431417502334..." (0% diff)
+  Status: 1 records with differences (all below 1% threshold)
+
+[DEEP] Comparing UniswapDayData...
+  Fetching all IDs from Subgraph... 660 Done (660)
+  Fetching all IDs from HyperIndex... 660 Done (660)
+  Common: 660, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Fetching 660 records from Subgraph... 660/660 Done
+  Fetching 660 records from HyperIndex... 660/660 Done
+
+=== UniswapDayData ===
+  Records: Subgraph=660, HyperIndex=660
+  Compared: 0 matched, 660 with differences
+  Field Mismatches: 1581
+    19871:
+      totalLiquidityETH: "58.251925674601293548000000..." vs "38.37544612609184566775" (34.12% diff)
+      totalLiquidityUSD: "31.485768575509814505871154..." vs "20.742325712245092747081515..." (34.12% diff)
+    19872:
+      totalLiquidityETH: "4511084.4278925609948398149..." vs "2272945.99187527007781342011" (49.61% diff)
+      totalLiquidityUSD: "2354965.8297745248710522606..." vs "1186568.3804747246444236761..." (49.61% diff)
+    19873:
+      totalLiquidityETH: "8530374.9930293345090839609..." vs "4277406.1139086137312341365" (49.86% diff)
+      totalLiquidityUSD: "4367393.9425783489955120307..." vs "2189952.6770039421049109133..." (49.86% diff)
+    19874:
+      totalLiquidityETH: "11278099.369645704427480888..." vs "5707217.80305357316719532419" (49.4% diff)
+      totalLiquidityUSD: "5726063.3876533031966977583..." vs "2897641.6891115588183054030..." (49.4% diff)
+    19875:
+      totalLiquidityETH: "11343473.732927162982801994..." vs "5730912.81369901741795722535" (49.48% diff)
+      totalLiquidityUSD: "5594558.4644924307267549942..." vs "2826464.5862475540018748456..." (49.48% diff)
+    ... and 655 more IDs with mismatches
+
+[DEEP] Comparing UniswapHourData...
+  Fetching all IDs from Subgraph... 15794 Done (15794)
+  Fetching all IDs from HyperIndex... 15794 Done (15794)
+  Common: 15794, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Limiting to 10000 records (of 15794 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== UniswapHourData ===
+  Records: Subgraph=15794, HyperIndex=15794
+  Compared: 0 matched, 10000 with differences
+  Field Mismatches: 20316
+    476927:
+      totalLiquidityETH: "58.251925674601293548000000..." vs "38.37544612609184566775" (34.12% diff)
+      totalLiquidityUSD: "31.485768575509814505871154..." vs "20.742325712245092747081515..." (34.12% diff)
+    476935:
+      totalLiquidityETH: "113.75491878563066692717572..." vs "66.12699625971824898635" (41.87% diff)
+      totalUntrackedVolumeUSD: "0" vs "0.0005392556957920056234233..." (100% diff)
+      totalLiquidityUSD: "61.485710656462274481668582..." vs "35.742325712245092747061965..." (41.87% diff)
+    476936:
+      totalLiquidityETH: "132.25455176926253709033158..." vs "66.12742512242691482369" (50% diff)
+      totalLiquidityUSD: "71.485641908855176614842887..." vs "35.742901619776917450258947..." (50% diff)
+    476940:
+      totalLiquidityETH: "144.66388392198787147509475..." vs "72.5300745430962152594" (49.86% diff)
+      totalLiquidityUSD: "77.237991332995880735490616..." vs "38.724781314195969296532917..." (49.86% diff)
+    476943:
+      hourlyVolumeUntracked: "4.0605680028973478822951716..." vs "4.0125226099221772138117064..." (1.18% diff)
+      hourlyFeesUSD: "0.0115209806483514037313780..." vs "0.0116942978550123034139968..." (1.5% diff)
+      totalLiquidityETH: "3830689.2874920244478502610..." vs "1912641.61390086879513047211" (50.07% diff)
+      totalLiquidityUSD: "2000076.0752139548047967860..." vs "998626.73407434341843486008..." (50.07% diff)
+    ... and 9994 more IDs with mismatches
+
+[DEEP] Comparing PairHourData...
+  Fetching all IDs from Subgraph... 101000[Subgraph] Hit 100k limit for PairHourData
+ Done (101000)
+  Fetching all IDs from HyperIndex... 101000[HyperIndex] Hit 100k limit for PairHourData
+ Done (101000)
+  Common: 100999, Missing in HyperIndex: 1, Missing in Subgraph: 1
+  Limiting to 10000 records (of 100999 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== PairHourData ===
+  Records: Subgraph=101000, HyperIndex=101000
+  Compared: 2 matched, 9998 with differences
+  Missing in HyperIndex: 1
+    - 0x1164cb64477dc06d533c4d8905d76adeb5adbb94-483544
+  Missing in Subgraph: 1
+    - 0x5613dbe210b9dc9bd06dca69854455ed9e811e4e-479756
+  Field Mismatches: 79
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-480468:
+      reserveUSD: "10027.362814217861911717176..." vs "10314.965319677937220547025..." (2.87% diff)
+      hourlyFeesUSD: "0.0144223013127938973666809..." vs "0.0152779708080032036363845..." (5.93% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-480474:
+      hourlyFeesUSD: "0.0146222823371270384593353..." vs "0.0144079418248318343482970..." (1.47% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-480849:
+      reserveUSD: "11057.227880031682297870999..." vs "10700.713086837119135460161..." (3.22% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-481155:
+      hourlyVolumeToken0: "0.003905478361475792" vs "0.004377704318701172" (12.09% diff)
+      hourlyVolumeToken1: "49424.411645370942257182" vs "55397.912378697334761505" (12.09% diff)
+      hourlyTxns: "7" vs "8" (14.29% diff)
+      hourlyFeesUSD: "0.0359547090399871176582625..." vs "0.0403111574077522809284656..." (12.12% diff)
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-481182:
+      reserveUSD: "12537.161923432076616773686..." vs "12230.024373572906934423415..." (2.45% diff)
+      hourlyFeesUSD: "0.0219967414098128938042188..." vs "0.0216752854842017110881890..." (1.46% diff)
+    ... and 61 more IDs with mismatches
+
+[DEEP] Comparing PairDayData...
+  Fetching all IDs from Subgraph... 43152 Done (43152)
+  Fetching all IDs from HyperIndex... 43152 Done (43152)
+  Common: 43152, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Limiting to 10000 records (of 43152 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== PairDayData ===
+  Records: Subgraph=43152, HyperIndex=43152
+  Compared: 14 matched, 9986 with differences
+  Field Mismatches: 87
+    0x0077ab73fb572a7fdad5cb716c31b9117ba15f45-20142:
+      dailyTxns: "56" vs "55" (1.79% diff)
+    0x027031462ccf336c63a1a7efbb7a742bbe353fe1-20003:
+      dailyVolumeUSD: "196.08912045216342633953131..." vs "0" (100% diff)
+    0x027031462ccf336c63a1a7efbb7a742bbe353fe1-20004:
+      dailyVolumeUSD: "256.52660147710171903282667..." vs "0" (100% diff)
+    0x027031462ccf336c63a1a7efbb7a742bbe353fe1-20005:
+      dailyVolumeUSD: "14.959083943047724834362149..." vs "0" (100% diff)
+    0x027031462ccf336c63a1a7efbb7a742bbe353fe1-20007:
+      dailyVolumeUSD: "189.26524842835699712987128..." vs "0" (100% diff)
+    ... and 64 more IDs with mismatches
+
+[DEEP] Comparing TokenDayData...
+  Fetching all IDs from Subgraph... 30706 Done (30706)
+  Fetching all IDs from HyperIndex... 30706 Done (30706)
+  Common: 30706, Missing in HyperIndex: 0, Missing in Subgraph: 0
+  Limiting to 10000 records (of 30706 common)
+  Fetching 10000 records from Subgraph... 10000/10000 Done
+  Fetching 10000 records from HyperIndex... 10000/10000 Done
+
+=== TokenDayData ===
+  Records: Subgraph=30706, HyperIndex=30706
+  Compared: 526 matched, 9474 with differences
+  Field Mismatches: 216
+    0x00bc9af972b5fb3b7fa04827bd3c17d4599bad8b-20039:
+      dailyVolumeUSD: "3434.2551597195291755615289..." vs "3481.8493798018742824021013..." (1.39% diff)
+    0x0555e30da8f98308edb960aa94c0db47230d2b9c-20384:
+      dailyVolumeToken: "0.00251415" vs "0.00262159" (4.27% diff)
+      dailyVolumeETH: "1418.2876096481076278803128..." vs "1476.6830856160205902317537..." (4.12% diff)
+      dailyVolumeUSD: "270.55154597852556228422230..." vs "281.79047627437166429620567..." (4.15% diff)
+      dailyTxns: "37" vs "39" (5.41% diff)
+      dailyFeesUSD: "0.2318299261774557096495290..." vs "0.2609362126370144952692162..." (12.56% diff)
+    0x0555e30da8f98308edb960aa94c0db47230d2b9c-20403:
+      dailyVolumeETH: "0.1122657504926623338512897..." vs "0.1111217963347598384671632..." (1.02% diff)
+      dailyVolumeUSD: "0.0203410394793171166695962..." vs "0.0201337704183050986137199..." (1.02% diff)
+      totalLiquidityETH: "11.524079288071788569834895..." vs "11.406652393763097418654305..." (1.02% diff)
+      totalLiquidityUSD: "2.0880077025519020261340569..." vs "2.0667315334390183726983563..." (1.02% diff)
+      priceUSD: "101705.19739658558334798134..." vs "100668.85209152549306859991..." (1.02% diff)
+    0x0555e30da8f98308edb960aa94c0db47230d2b9c-20411:
+      dailyVolumeETH: "0.3610858753160094147272473..." vs "0.3548983624834110113733150..." (1.71% diff)
+      dailyVolumeUSD: "0.0507894022613334870749620..." vs "0.0499190827619153108263452..." (1.71% diff)
+      totalLiquidityETH: "14.960283422406429280758306..." vs "14.703926273087205235917935..." (1.71% diff)
+      totalLiquidityUSD: "2.1042746466313266311646033..." vs "2.0682161152142559171777933..." (1.71% diff)
+      dailyFeesUSD: "0.0001523682067840004612248..." vs "0.0001497572482857459324790..." (1.71% diff)
+      priceUSD: "99587.063257516641323454961..." vs "97880.554435128060443814166..." (1.71% diff)
+    0x0555e30da8f98308edb960aa94c0db47230d2b9c-20412:
+      dailyVolumeETH: "0.1479364670930193159572586..." vs "0.1445280526068675639301470..." (2.3% diff)
+      dailyVolumeUSD: "0.0213403188251520587721119..." vs "0.0208486438970424808311151..." (2.3% diff)
+      totalLiquidityETH: "13.738795378725619951508888..." vs "13.422257407316048545860609..." (2.3% diff)
+      totalLiquidityUSD: "1.9818661308923825016187422..." vs "1.9362044940905538719679122..." (2.3% diff)
+      dailyFeesUSD: "0.0000640209564754561763163..." vs "0.0000625459316911274424933..." (2.3% diff)
+      priceUSD: "92783.994891965472922225759..." vs "90646.277813228177526587651..." (2.3% diff)
+    ... and 76 more IDs with mismatches
+
+========== COMPARISON SUMMARY ==========
+
+Entity Status:
+  [ERR] UniswapFactory
+  [ERR] Token
+  [ERR] Pair
+  [OK] User
+  [ERR] LiquidityPosition
+  [ERR] LiquidityPositionSnapshot
+  [ERR] Transaction
+  [ERR] PairTransfer
+  [ERR] Mint
+  [ERR] Burn
+  [OK] Swap
+  [WARN] Bundle
+  [ERR] UniswapDayData
+  [ERR] UniswapHourData
+  [ERR] PairHourData
+  [ERR] PairDayData
+  [ERR] TokenDayData
+
+Totals:
+  Total Subgraph Records: 598038
+  Total HyperIndex Records: 581972
+  Matched: 42095
+  With Differences: 75857
+  Missing in HyperIndex: 16132
+  Missing in Subgraph: 68
+
+Overall: Issues detected - review above details
+
+Report saved to: output/comparison-2026-03-18_14-15-12.json
+kenauvith@kenaus-MacBook-Pro indexer-migration-validator % 

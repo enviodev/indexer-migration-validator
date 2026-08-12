@@ -87,6 +87,16 @@ export async function loadEntityConfigsFromSchemas(
     if (result.unmatchedHyperindexEntities.length > 0) {
       console.log(`\nUnmatched HyperIndex Entities: ${result.unmatchedHyperindexEntities.join(', ')}`);
     }
+
+    // These fields are NEVER COMPARED. Printing them is the difference between
+    // "this entity matched" and "this entity matched on the fields we looked at".
+    const unmappedEntries = Object.entries(result.unmappedSubgraphFields);
+    if (unmappedEntries.length > 0) {
+      console.log(`\nUNCOMPARED subgraph fields (no hyperindex counterpart):`);
+      for (const [entity, fields] of unmappedEntries) {
+        console.log(`  ${entity}: ${fields.join(', ')}`);
+      }
+    }
   }
 
   _entityConfigs = result.configs;

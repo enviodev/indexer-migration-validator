@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "pumex-helper vs the MERGED endpoint (2a5ef57), which serves all five source",
+    "indexers at once. Run with --entity-prefix Helper_ so subgraph `Gauge`",
+    "resolves to `Helper_Gauge`, and with --chain <id> so ids are prefix-filtered",
+    "and stripped.",
+    "",
+    "Four chains, four subgraphs, four schema files:",
+    "  59144 Linea      lynex-helper/0.0.2   subgraph-schema.59144.graphql  (11 entities)",
+    "  9745  Plasma     ionex-helper/0.3     subgraph-schema.9745.graphql   (19 entities)",
+    "  4663  Robinhood  orvex-helper/1.0.1   subgraph-schema.4663.graphql   (19 entities)",
+    "  1776  Injective  pumex-helper/v0.0.2  subgraph-schema.1776.graphql   (19 entities, Ormi)",
+    "  48900 Zircuit    chain dormant — not validated",
+    "",
+    "lynex-helper carries only 11 of the 26 Helper_ types: the ve/points family",
+    "(VeLock, VeToken, VeTokenSnapshot, VeUser, VeUserLockDelta), plus Block,",
+    "GaugeState and Harvest, are absent from that deployment. Per-chain schema",
+    "files are what keep those out of the run rather than aborting on them.",
+    "",
+    "The 7 PreMining* types exist in the merged schema but in NO helper subgraph,",
+    "so they have no reference to compare against on any chain."
+  ],
+
+  "fieldMappings": {},
+
+  "knownIdMismatch": [],
+
+  "idMatchConfirmed": [
+    "VeUserLockDelta"
+  ],
+
+  "skipFields": {},
+
+  "skipEntities": []
+}

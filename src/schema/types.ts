@@ -74,6 +74,13 @@ export interface GeneratorResult {
   warnings: ConfigWarning[];
   unmatchedSubgraphEntities: string[];
   unmatchedHyperindexEntities: string[];
+  /**
+   * Per-entity subgraph fields that found no hyperindex counterpart and are
+   * therefore NEVER COMPARED. Silently dropping these makes a run look like it
+   * covered an entity in full when it did not, so any coverage claim has to be
+   * read alongside this list.
+   */
+  unmappedSubgraphFields: Record<string, string[]>;
 }
 
 export interface Overrides {
