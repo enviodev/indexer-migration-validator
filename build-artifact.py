@@ -384,7 +384,10 @@ LEADS = {
    '<a href="#case-vetoken">case&nbsp;2</a>.</p>',
  "helper-1776": '<p class="lead">The control. This pair was already known-clean, and reproducing it '
    'exactly is what validates the harness itself before any larger run is trusted.</p>',
- "v1-59144": "",
+ "v1-59144": '<p class="lead">The largest deployment in the campaign by row count &mdash; three million '
+   'rows, reconciling exactly. This includes <code>Swap</code> and <code>Transaction</code>, which the '
+   'previous campaign had not compared at all. Every field difference that remains belongs to the single '
+   'open class in <a href="#case-untracked">case&nbsp;4</a>.</p>',
  "v1-4663": "",
 }
 
@@ -419,6 +422,11 @@ REASONS = {
    'the same 41.0194% &mdash; <a href="#case-swap">case&nbsp;6</a>',
  ("analytics-239","Factory"): 'global accumulators short by the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
  ("analytics-239","Tick"): 'liquidity accumulators spanning the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
+ ("v1-59144","Pair"): 'untracked volume residue &mdash; <a href="#case-untracked">case&nbsp;4</a>',
+ ("v1-59144","Token"): 'untracked volume residue &mdash; <a href="#case-untracked">case&nbsp;4</a>',
+ ("v1-59144","Factory"): 'untracked volume residue &mdash; <a href="#case-untracked">case&nbsp;4</a>',
+ ("v1-59144","DayData"): '<code>dailyVolumeUntracked</code> &mdash; <a href="#case-untracked">case&nbsp;4</a>',
+ ("v1-59144","Swap"): '<span class="q">exact across the 10,000 rows compared</span>',
  ("analytics-239","PoolPosition"): 'liquidity accumulator spanning the gap &mdash; <a href="#case-swap">case&nbsp;6</a>',
 }
 
@@ -493,9 +501,15 @@ def build_cases():
       "dynamic data sources, while the <code>Swap</code> id is an ordinal over "
       "<code>transaction.swaps.length</code>.</p>"
       + "<p>The consequence is that the same two <code>amountUSD</code> values appear under permuted ids. "
-        "No quantity changed &mdash; and <code>Token.tradeVolumeUSD</code>, which sums them, matches "
-        "byte-for-byte. This is a limitation of how the subgraph assigns ids, not a difference in what "
-        "either side computed.</p>"))
+        "No quantity changed &mdash; the day's swap set matches 9 for 9 with none missing, each swap's pair "
+        "attribution matches, and <code>Token.tradeVolumeUSD</code> for BULL matches byte-for-byte at "
+        "319308.8121996806521651361270023957. This is a limitation of how the subgraph assigns ids, not a "
+        "difference in what either side computed.</p>"
+      + "<p><strong>Coverage note.</strong> This run compared 10,000 of the 1,274,386 Linea swaps and found "
+        "no field differences among them; the permuted pair above sits outside that window. The class is "
+        "carried forward from the earlier root-cause investigation rather than re-observed here, and the "
+        "row counts &mdash; which <em>are</em> exhaustive &mdash; match exactly, as a permutation of ids "
+        "over the same set requires.</p>"))
 
     c.append(case("case-untracked", 4, "open", "Untracked-volume residue",
       "Open · unexplained · lands above 0.1%",
@@ -508,8 +522,13 @@ def build_cases():
         "a token is not whitelisted, and BULL has <code>derivedETH = 0</code> on both sides. Tracked volume "
         "is unaffected. The same family of finding appears in "
         "<code>pumex-algebra-envio/docs/HANDOFF.md</code>&nbsp;&sect;6.4.</p>"
-      + "<p><strong>This is reported as open.</strong> No root cause has been established, and none is "
-        "asserted here.</p>"))
+      + "<p><strong>Still present, and still open.</strong> v1/59144 reproduces exactly this class and "
+        "nothing else: all five of its field differences are "
+        "<code>untrackedVolumeUSD</code> on <code>Factory</code>, <code>Pair</code> and <code>Token</code>, "
+        "plus <code>DayData.dailyVolumeUntracked</code> &mdash; every one of them on a small entity that "
+        "was compared in full, so this is not a sampling artefact. The <code>TokenDayData</code> instance "
+        "falls outside that deployment's 10,000-row window.</p>"
+      + "<p>No root cause has been established, and none is asserted here.</p>"))
 
     c.append(case("case-farm", 5, "attention", "The subgraph has its own gap, around block 17,530,0xx",
       "New this session · subgraph defect · Envio matches the chain in both instances",
@@ -667,13 +686,19 @@ PRIOR = {
  "helper-1776":  ("3,642 / 3,642", "0", "agree"),
  "helper-9745":  ("88,642 / 88,642", "98, all amountDecimals ULP", "differ"),
  "helper-4663":  ("933 / 935", "0 — wrong VeToken address", "agree"),
- "v1-59144":     ("458,394 / 458,394", "9 (3 not ULP)", None),
+ "v1-59144":     ("458,394 / 458,394", "9 (3 not ULP)", "differ"),
  "v1-4663":      ("36 / 36", "0", "agree"),
  "farm-239":     ("917 / 917", "0", "differ"),
  "analytics-239":("27 entities", "8 entities ULP-only", "differ"),
 }
 
 RECON_NOTES = {
+ "v1-59144": "Not comparable as totals, and better now. &sect;6's own note says <code>Transaction</code> "
+   "and <code>Swap</code> were <em>not yet compared</em> on Linea; this run includes both &mdash; "
+   "1,274,386 swaps and 1,119,956 transactions &mdash; and finds them exact. All 16 entities reconcile "
+   "row for row. The 5 remaining field differences are all "
+   "<code>untrackedVolumeUSD</code>/<code>dailyVolumeUntracked</code>, which is the open class in "
+   "<a href=\"#case-untracked\">case&nbsp;4</a>, matching &sect;6's &ldquo;3 of them not ULP&rdquo;.",
  "helper-9745": "Same class, different count. Both runs find only "
    "<code>DepositTokenBalance.amountDecimals</code> dust. The count moves because the earlier run was "
    "taken at a different head, so the accumulators had different residues; this run compares all 386 "
