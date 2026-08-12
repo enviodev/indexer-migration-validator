@@ -479,25 +479,33 @@ def build_cases():
         "&ldquo;0&nbsp;% difference&rdquo;, indistinguishable from an exact match. It is now computed in "
         "exact scaled-integer arithmetic.</p>"))
 
-    c.append(case("case-vetoken", 2, "defect", "Chain 4663 indexes a different VeToken contract",
-      "Real defect · inherited, not caused by the merge · needs a human decision",
-      "<p>On Robinhood, the merged indexer and the <code>orvex-helper</code> subgraph agree on nothing and "
-      "disagree about nothing. Every id in <code>Block</code>, <code>VeToken</code> and "
-      "<code>VeTokenSnapshot</code> is disjoint, and among rows that do correspond there is not a single "
-      "field difference. Two indexers that were reading the same contract and diverging would produce "
-      "overlapping ids with differing values; disjoint ids with clean fields means they are reading "
-      "<em>different contracts</em>.</p>"
-      + '<div class="ev"><table><thead><tr><th>side</th><th>VeToken address</th></tr></thead><tbody>'
-        "<tr><td>merged indexer</td><td>0xd2190fc5df4abdc9dc4b6804dabe3435b14eb8b3</td></tr>"
-        "<tr><td>orvex-helper subgraph</td><td>0x18657ff9943faa5d16c6ea1bc13dd8767984c30e</td></tr>"
+    c.append(case("case-vetoken", 2, "match", "Chain 4663 was indexing the wrong contract — fixed",
+      "Real defect · root-caused and corrected · was 933 vs 935 with zero ids in common",
+      "<p>On Robinhood the merged indexer and the <code>orvex-helper</code> subgraph used to agree on "
+      "nothing and disagree about nothing: every id in <code>Block</code>, <code>VeToken</code> and "
+      "<code>VeTokenSnapshot</code> was disjoint, with not one field difference among them. That is the "
+      "signature of two correct indexers reading <em>different things</em>, and it turned out to be two "
+      "separate bugs.</p>"
+      + "<p><strong>The wrong contract.</strong> Queried on-chain, the address we bound is not the "
+        "VotingEscrow at all:</p>"
+      + '<div class="ev"><table><thead><tr><th>side</th><th>address</th><th>name()</th><th>symbol()</th><th>supply()</th></tr></thead><tbody>'
+        "<tr><td>merged (was)</td><td>0xd2190fc5…</td><td>Bribe veORVX</td><td>bveORVX</td><td>absent</td></tr>"
+        "<tr><td>subgraph</td><td>0x18657ff9…</td><td>Voting Escrow Orvex</td><td>veORVX</td><td>present</td></tr>"
         "</tbody></table></div>"
-      + "<p>The subgraph's address was confirmed live this session. The merge did not introduce this: "
-        "<code>pumex-helper-envio</code> binds the same address the merged config does, and a config diff "
-        "across all 38 bindings found zero address discrepancies. It is also 4663-only &mdash; Plasma and "
-        "Injective match their subgraphs exactly on the same entity types.</p>"
-      + "<p><strong>Open question for a human:</strong> which contract is the correct one. This is a "
-        "configuration question about the source indexer, not a porting bug, and it cannot be settled from "
-        "the data alone.</p>"))
+      + "<p>It is a bribe wrapper, not the escrow. Every other chain binds a real VotingEscrow — Plasma "
+        "\u201cVoting Escrow Ionex\u201d, Injective \u201cVoting Escrow Pumex\u201d — so Robinhood was the "
+        "odd one out. The address also seeds the <code>VeToken</code> and <code>VeTokenSnapshot</code> ids, "
+        "which is why those sets could never intersect.</p>"
+      + "<p><strong>The wrong polling anchors.</strong> Both were left at the chain\u2019s "
+        "<code>start_block</code> (1,873,667) instead of the subgraph\u2019s polling origin, so the two "
+        "sides sampled different heights on the same 69,000-block cadence and shared no block at all. The "
+        "subgraph\u2019s anchors are 1,966,166 for <code>Block</code> and 1,964,611 for "
+        "<code>VeTokenSnapshot</code>. The arithmetic confirms both directions: "
+        "(34,068,305\u2009\u2212\u20091,966,166)\u2009//\u200969,000\u2009+\u20091 = <strong>466</strong>, "
+        "the subgraph\u2019s count, while the old anchor gives <strong>467</strong> — exactly what we were "
+        "emitting.</p>"
+      + "<p>Both were corrected and redeployed. This was <em>not</em> a case of matching a subgraph we "
+        "believed to be wrong: the subgraph was right and the indexer was wrong.</p>"))
 
     c.append(case("case-swapid", 3, "ulp", "Swap id ordering on Linea",
       "Subgraph limitation · permutation, not a numeric difference",
@@ -566,43 +574,43 @@ def build_cases():
         "<code>KNOWN_DIVERGENCES</code> filter and subtracts it before reporting. Both numbers are right; "
         "this report does not filter.</p>"))
 
-    c.append(case("case-swap", 6, "defect", "A 29-hour indexing gap on chain 239",
-      "New this session · confirmed · the most consequential finding in this report",
+    c.append(case("case-swap", 6, "defect", "A 29-hour hole in HyperSync's chain-239 index",
+      "Root-caused upstream · not fixable from here · the one deployment that does not reconcile",
       "<p>The merged indexer is missing <strong>2,926 swaps</strong> and <strong>2,233 transactions</strong> "
-      "on chain 239. These are not scattered losses. Every one of the 2,233 missing transactions falls "
-      "inside a single contiguous block window:</p>"
+      "on chain 239, every one of them inside a single contiguous window:</p>"
       + '<div class="ev"><table><thead><tr><th></th><th>value</th></tr></thead><tbody>'
         "<tr><td>block range</td><td>21,709,896 &ndash; 21,776,530</td></tr>"
         "<tr><td>span</td><td>66,634 blocks</td></tr>"
         "<tr><td>wall clock</td><td>2026-06-29 07:08:41Z &rarr; 2026-06-30 12:06:21Z</td></tr>"
         "<tr><td>duration</td><td>104,260 s = 29.0 hours</td></tr>"
         "</tbody></table></div>"
-      + "<p>Inside that window the merged indexer holds <strong>zero</strong> rows where the subgraph holds "
-        "2,233. Immediately on either side of it the two agree exactly &mdash; 0 vs 0 in the 20,000 blocks "
-        "before, 69 vs 69 in the 23,000 blocks after. The indexer stopped recording and resumed cleanly.</p>"
-      + "<p>Two independent measurements confirm the duration. <code>Analytics_AlgebraHourData</code> is a "
-        "global series with exactly one row per hour, and it is missing exactly <strong>29 buckets</strong> "
-        "&mdash; matching the 29.0-hour wall-clock span computed from block timestamps. Nothing else in the "
-        "dataset would make those two numbers agree by chance.</p>"
-      + "<p>Everything else on this deployment follows from the hole. The "
-        "<code>WETH/USD&#8366;</code> pool <code>0x69916939&hellip;</code> missed the swap at block "
-        "21,719,043 that drove it to its minimum tick, so it still reports a stale price of 1,644.18 where "
-        "the subgraph reports the pool drained. WETH\'s <code>derivedMatic</code> is consequently wrong, and "
-        "every token priced through WETH inherits <em>precisely</em> the same relative error &mdash; "
-        "41.0194&nbsp;% on WETH, cbBTC, wstETH, LBTC and uniBTC alike. An identical error across five "
-        "independent tokens is the fingerprint of one shared upstream price. The missing hourly and daily "
-        "buckets, and the large <code>volumeUSD</code> and <code>totalValueLocked</code> differences, all "
-        "trace back to the same 29 hours.</p>"
-      + "<p><strong>What is not established: the cause.</strong> A contiguous outage that starts and stops "
-        "on clean block boundaries, with exact agreement either side, is an ingestion or backfill gap rather "
-        "than a mapping bug &mdash; handler logic does not fail for 29 hours and then resume perfectly. "
-        "Beyond that this report does not speculate. Note in particular that it is <em>not</em> the RPC "
-        "effect-failure mechanism of case&nbsp;7: those substitute a default into a row that exists, whereas "
-        "here the rows are absent entirely, and chain 239 ingests via HyperSync rather than the RPC.</p>"
-      + "<p>There is also no baseline to compare against. The standalone analytics parity run covered only "
-        "to block 4,600,000; this window is at 21.7M, so no previous campaign would have seen it. "
-        "<strong>This needs a re-index of the affected range and a re-check before the merged indexer is "
-        "relied on for chain 239.</strong></p>"))
+      + "<p>Two independent measurements agree on the duration: the block-timestamp span is 29.0 hours, and "
+        "<code>Analytics_AlgebraHourData</code> — one row per hour, globally — is missing exactly "
+        "<strong>29</strong> buckets.</p>"
+      + "<p><strong>The hole is in HyperSync, not in the indexer.</strong> Queried directly with a bare "
+        "all-logs filter, so nothing of ours is involved:</p>"
+      + '<div class="ev"><table><thead><tr><th>window</th><th>logs in HyperSync</th></tr></thead><tbody>'
+        "<tr><td>21,690,000 &ndash; 21,709,895</td><td>972</td></tr>"
+        "<tr><td>21,709,896 &ndash; 21,776,530</td><td><strong>0</strong></td></tr>"
+        "<tr><td>21,776,531 &ndash; 21,800,000</td><td>6,251</td></tr>"
+        "</tbody></table></div>"
+      + "<p>It returns success with zero rows rather than an error, so <code>for: fallback</code> never "
+        "triggers and the deployment faithfully indexed the emptiness.</p>"
+      + "<p><strong>RPC has the data, but cannot be used.</strong> <code>eth_getLogs</code> over the same "
+        "range does return the missing swap — block 21,719,043, logIndex 5, tx "
+        "<code>0x2e3d2502…</code>. So chain 239 was switched to RPC sync and deployed. It fails "
+        "structurally: TAC emits transactions its own node cannot decode "
+        "(<code>errUnknownField &quot;*types.MsgEthereumTx&quot;</code>), Envio needs the transaction object "
+        "to fill <code>transaction_fields</code>, and it retries such a hash forever. Chain 239 sat at block "
+        "&minus;1 and never advanced while the other chains reached 68&ndash;80&nbsp;%. Dropping "
+        "<code>transaction_fields</code> to avoid the fetch would zero <code>gasPrice</code> and "
+        "<code>index</code> on 171,854 rows to recover 2,233. The change was reverted.</p>"
+      + "<p><strong>Conclusion: both sources fail, for unrelated reasons, so this range is unobtainable.</strong> "
+        "Everything else on this deployment follows from the hole — the stale <code>WETH/USD&#8366;</code> "
+        "pool price, the missing hourly buckets, and the identical 41.0194&nbsp;% <code>derivedMatic</code> "
+        "error across the five tokens priced through WETH, which is the fingerprint of one shared upstream "
+        "price. A re-index reproduces the same gap; the fix has to come from Envio backfilling the "
+        "index.</p>"))
 
     c.append(case("case-tac", 7, "attention", "TAC runs on a public non-archive RPC",
       "Standing caveat · data quality, not a merge defect",
