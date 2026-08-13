@@ -43,6 +43,13 @@ TARGETS=(
 "helper-9745|$GOLDSKY/ionex-helper/0.3/gn|./pumex-helper/subgraph-schema.9745.graphql|./pumex-helper/overrides.json|Helper_|9745|29553607"
 "v1-59144|$GOLDSKY/lynex-v1/1.0.4/gn|./pumex-v1/subgraph-schema.59144.graphql|./pumex-v1/overrides.json|V1_|59144|31696749"
 "helper-59144|$GOLDSKY/lynex-helper/0.0.2/gn|./pumex-helper/subgraph-schema.59144.graphql|./pumex-helper/overrides.json|Helper_|59144|31696749"
+# Added 2026-08-13: references supplied that were previously "no URL on file".
+# v4-1776 in particular was recorded as "never had a URL", so v4 is no longer
+# wholly unvalidatable — only v4/4663 is, since v4-orvex still 404s.
+"v1-239|$GOLDSKY/v1-snap/0.1/gn|./pumex-v1/subgraph-schema.239.graphql|./pumex-v1/overrides.json|V1_|239|0"
+"v1-9745|$GOLDSKY/v1-ionex/0.2/gn|./pumex-v1/subgraph-schema.9745.graphql|./pumex-v1/overrides.json|V1_|9745|0"
+"v1-1776|$ORMI/pumex-v1/v0.0.1/gn|./pumex-v1/subgraph-schema.1776.graphql|./pumex-v1/overrides.json|V1_|1776|0"
+"v4-1776|$ORMI/pumex-v4cl-main/v1.0.1/gn|./pumex-v4/subgraph-schema.1776.graphql|./pumex-v4/overrides.json|V4_|1776|0"
 )
 
 mkdir -p "$OUTDIR"

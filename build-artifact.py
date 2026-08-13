@@ -20,7 +20,8 @@ CHAIN_NAMES = {239: "TAC", 1776: "Injective", 4663: "Robinhood", 9745: "Plasma",
 ORDER = [
     "analytics-239", "farm-239",
     "helper-59144", "helper-9745", "helper-4663", "helper-1776",
-    "v1-59144", "v1-4663",
+    "v1-59144", "v1-9745", "v1-4663", "v1-1776", "v1-239",
+    "v4-1776",
 ]
 
 
@@ -116,7 +117,7 @@ def deployment_section(key, dep, prose, reasons):
   <header class="dep-head">
     <div class="dep-title">
       <h3>{esc(dep['indexer'])} <span class="sep">/</span> <span class="chain">chain {chain} {esc(CHAIN_NAMES.get(chain,''))}</span></h3>
-      <p class="ref">reference <code>{esc(dep['subgraph'])}</code> &nbsp;·&nbsp; pinned at block <code>{fmt(PINS[chain])}</code></p>
+      <p class="ref">reference <code>{esc(dep['subgraph'])}</code></p>
     </div>
     <span class="chip c-{v}">{VERDICT_LABEL[v]}</span>
   </header>
@@ -394,6 +395,21 @@ LEADS = {
    'previous campaign had not compared at all. Every field difference that remains belongs to the single '
    'open class in <a href="#case-untracked">case&nbsp;4</a>.</p>',
  "v1-4663": "",
+ "v1-239": '<p class="lead">Newly validatable — this reference had no URL on file before. Its 3,150 '
+   'missing rows are <strong>not a v1 defect</strong>: every one sampled falls inside the same '
+   '66,634-block HyperSync hole as <a href="#case-swap">case&nbsp;6</a>, which affects every indexer '
+   'family on chain 239. The <code>Token</code> metadata differences are the separate RPC caveat in '
+   '<a href="#case-tac">case&nbsp;7</a>.</p>',
+ "v1-9745": '<p class="lead">Newly validatable, and 2.1M rows reconcile with nothing missing. The 12 '
+   'surplus rows are a measurement artifact, not data: <code>V1_Swap</code> has no block column, so the '
+   'merged side cannot be pinned, and all 12 sit at blocks strictly after the pin while the indexer kept '
+   'advancing mid-run.</p>',
+ "v1-1776": '<p class="lead">Newly validatable, and exact — 163,703 rows, nothing missing, nothing '
+   'extra, not one field different.</p>',
+ "v4-1776": '<p class="lead">The v4 indexer <strong>can</strong> be validated after all, on this chain. '
+   'A reference was located for Injective that was previously recorded as never having had a URL. It '
+   'reconciles row for row; every field difference sits on one column and none exceeds 0.1&nbsp;%. '
+   'v4/4663 remains unmeasurable — see <a href="#case-v4">case&nbsp;9</a>.</p>',
 }
 
 REASONS = {
@@ -640,15 +656,19 @@ def build_cases():
       + "<p>None of these are failures. They are listed so that &ldquo;every entity matched&rdquo; is not "
         "read as &ldquo;every entity was checked&rdquo;.</p>"))
 
-    c.append(case("case-v4", 9, "none", "v4 cannot be validated at all",
-      "Neither a pass nor a failure · both references are gone",
-      "<p>The v4 indexer has no reference subgraph left to compare against:</p>"
-      + "<ul><li><code>v4-orvex/1.0.0</code> (chain 4663) returns HTTP 404 &mdash; confirmed again this "
-        "session. Goldsky reports the subgraph as deleted.</li>"
-        "<li><code>pumex-v4</code> (chain 1776) never had a URL on file.</li></ul>"
-      + "<p>All 18 <code>V4_</code> entity types are therefore unverified. This is pre-existing and outside "
-        "the merge &mdash; nothing about the merged deployment caused it, and nothing in this report should "
-        "be read as evidence that v4 is either correct or incorrect. It is simply unmeasured.</p>"))
+    c.append(case("case-v4", 9, "attention", "v4 is validatable after all — on one chain",
+      "Correction · a previous conclusion overturned · v4/4663 remains unmeasurable",
+      "<p>An earlier version of this report stated that v4 could not be validated at all, because both "
+      "of its reference subgraphs were gone. <strong>That was wrong for chain 1776.</strong> A reference "
+      "does exist on Injective — <code>pumex-v4cl-main/v1.0.1</code>, hosted on Ormi rather than Goldsky "
+      "— which had been recorded as &ldquo;never had a URL&rdquo;.</p>"
+      + "<p>Validated against it, v4/1776 reconciles: <strong>56,929 rows on both sides, nothing missing, "
+        "nothing extra</strong>. All 173 field differences sit on a single column "
+        "(<code>ModifyLiquidity.amountUSD</code>) and not one exceeds 0.1&nbsp;%, placing them in the "
+        "rounding class of <a href=\"#case-ulp\">case&nbsp;1</a>.</p>"
+      + "<p><strong>v4 on chain 4663 is still unmeasurable.</strong> <code>v4-orvex/1.0.0</code> returns "
+        "HTTP 404 — re-confirmed — and Goldsky reports it deleted. That half remains neither a pass nor a "
+        "failure; it is simply unmeasured, and nothing about the merged deployment caused it.</p>"))
 
     return "\n".join(c)
 
@@ -716,9 +736,18 @@ PRIOR = {
  "helper-1776":  ("3,642 / 3,642", "0", "agree"),
  "v1-59144":     ("3,003,747 / 3,003,747", "5", "agree"),
  "v1-4663":      ("36 / 36", "0", "agree"),
+ "v1-239":       ("not validated", "&mdash;", "new"),
+ "v1-9745":      ("not validated", "&mdash;", "new"),
+ "v1-1776":      ("not validated", "&mdash;", "new"),
+ "v4-1776":      ("not validated", "&mdash;", "new"),
 }
 
 RECON_NOTES = {
+ "v1-239":  "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",
+ "v1-9745": "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",
+ "v1-1776": "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",
+ "v4-1776": "<strong>New, and it overturns a previous conclusion.</strong> v4 was reported as impossible "
+   "to validate because both references were gone; one exists for Injective. See <a href=\"#case-v4\">case&nbsp;9</a>.",
  "helper-4663": "<strong>Fixed.</strong> Was 933 vs 935 with <em>zero</em> ids in common, because the "
    "indexer bound a bribe wrapper instead of the VotingEscrow and polled on the wrong anchors. Both "
    "corrected and redeployed; the two sides now agree row for row and field for field. See "
@@ -826,7 +855,7 @@ def main():
     field.</p>
 
     <dl class="facts">
-      <div class="fact"><dt>deployments checked</dt><dd>{len(deps)} of 9</dd></div>
+      <div class="fact"><dt>deployments checked</dt><dd>{len(deps)} of 13</dd></div>
       <div class="fact"><dt>entity types</dt><dd>{gtot['ent']}</dd></div>
       <div class="fact"><dt>rows enumerated</dt><dd>{fmt(gtot['sg'] + gtot['envio'])}</dd></div>
       <div class="fact"><dt>rows field-compared</dt><dd>{fmt(gtot['cmp'])}</dd></div>

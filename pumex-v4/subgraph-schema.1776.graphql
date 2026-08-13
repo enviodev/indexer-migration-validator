@@ -1,0 +1,333 @@
+# GENERATED from the live subgraph by `introspect-subgraph.ts`.
+# Do not hand-edit — regenerate instead.
+# Source: https://api.subgraph.ormilabs.com/api/public/414271d5-5c72-4403-ac1e-fabd86621904/subgraphs/pumex-v4cl-main/v1.0.1/gn
+#
+# Relations stay object-typed so the matcher can map them onto the
+# hyperindex `<name>_id` column. List-of-entity fields are kept so they show
+# up as UNCOMPARED rather than vanishing from the report.
+
+type Bundle @entity {
+  id: ID!
+  nativePriceUSD: BigDecimal!
+}
+
+type ModifyLiquidity @entity {
+  id: ID!
+  transaction: Transaction!
+  timestamp: BigInt!
+  pool: Pool!
+  token0: Token!
+  token1: Token!
+  sender: Bytes
+  origin: Bytes!
+  amount: BigInt!
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  amountUSD: BigDecimal
+  tickLower: BigInt!
+  tickUpper: BigInt!
+  salt: Bytes!
+  logIndex: BigInt
+  transactionLogIndex: BigInt
+}
+
+type ModifyLiquidityCache @entity {
+  id: ID!
+  hash: Bytes!
+  logIndex: BigInt!
+  modifyLiquidities: [ModifyLiquidity!]!
+}
+
+type Pool @entity {
+  id: ID!
+  createdAtTimestamp: BigInt!
+  createdAtBlockNumber: BigInt!
+  token0: Token!
+  token1: Token!
+  dynamicLPFee: Boolean!
+  feeTier: BigInt!
+  swapFee: BigInt!
+  protocolFee: BigInt!
+  lpFee: BigInt!
+  liquidity: BigInt!
+  sqrtPrice: BigInt!
+  token0Price: BigDecimal!
+  token1Price: BigDecimal!
+  tick: BigInt
+  tickSpacing: BigInt!
+  observationIndex: BigInt!
+  hooksRegistration: Bytes!
+  parameters: Bytes!
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  txCount: BigInt!
+  collectedFeesToken0: BigDecimal!
+  collectedFeesToken1: BigDecimal!
+  collectedFeesUSD: BigDecimal!
+  totalValueLockedToken0: BigDecimal!
+  totalValueLockedToken1: BigDecimal!
+  totalValueLockedNative: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  totalValueLockedUSDUntracked: BigDecimal!
+  liquidityProviderCount: BigInt!
+  poolHourData: [PoolHourData!]!
+  poolDayData: [PoolDayData!]!
+  hooks: String!
+  modifyLiquiditys: [ModifyLiquidity!]!
+  swaps: [Swap!]!
+  ticks: [Tick!]!
+}
+
+type PoolDayData @entity {
+  id: ID!
+  date: Int!
+  pool: Pool!
+  liquidity: BigInt!
+  sqrtPrice: BigInt!
+  token0Price: BigDecimal!
+  token1Price: BigDecimal!
+  tick: BigInt
+  tvlUSD: BigDecimal!
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  txCount: BigInt!
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+}
+
+type PoolHourData @entity {
+  id: ID!
+  periodStartUnix: Int!
+  pool: Pool!
+  liquidity: BigInt!
+  sqrtPrice: BigInt!
+  token0Price: BigDecimal!
+  token1Price: BigDecimal!
+  tick: BigInt
+  tvlUSD: BigDecimal!
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  txCount: BigInt!
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+}
+
+type PoolManager @entity {
+  id: ID!
+  poolCount: BigInt!
+  txCount: BigInt!
+  totalVolumeUSD: BigDecimal!
+  totalVolumeNative: BigDecimal!
+  totalFeesUSD: BigDecimal!
+  totalFeesNative: BigDecimal!
+  totalProtocolFeesUSD: BigDecimal!
+  totalProtocolFeesNative: BigDecimal!
+  totalLpFeesUSD: BigDecimal!
+  totalLpFeesNative: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  totalValueLockedNative: BigDecimal!
+  totalValueLockedUSDUntracked: BigDecimal!
+  totalValueLockedNativeUntracked: BigDecimal!
+  owner: ID!
+}
+
+type Position @entity {
+  id: ID!
+  tokenId: BigInt!
+  owner: String!
+  origin: String!
+  pool: Pool!
+  tickLower: BigInt!
+  tickUpper: BigInt!
+  liquidity: BigInt!
+  token0Balance: BigDecimal!
+  token1Balance: BigDecimal!
+  depositedToken0: BigDecimal
+  depositedToken1: BigDecimal
+  withdrawnToken0: BigDecimal
+  withdrawnToken1: BigDecimal
+  createdAtBlock: BigInt!
+  createdAtTimestamp: BigInt!
+  subscriptions: [Subscribe!]!
+  unsubscriptions: [Unsubscribe!]!
+  transfers: [Transfer!]!
+}
+
+type ProtocolDayData @entity {
+  id: ID!
+  date: Int!
+  volumeNative: BigDecimal!
+  volumeUSD: BigDecimal!
+  volumeUSDUntracked: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  txCount: BigInt!
+  tvlUSD: BigDecimal!
+}
+
+type Subscribe @entity {
+  id: ID!
+  tokenId: BigInt!
+  address: String!
+  transaction: Transaction!
+  logIndex: BigInt!
+  timestamp: BigInt!
+  origin: String!
+  position: Position!
+}
+
+type Swap @entity {
+  id: ID!
+  transaction: Transaction!
+  timestamp: BigInt!
+  pool: Pool!
+  token0: Token!
+  token1: Token!
+  sender: Bytes!
+  origin: Bytes!
+  amount0Raw: BigInt!
+  amount1Raw: BigInt!
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  amountUSD: BigDecimal!
+  swapFee: BigInt!
+  protocolFee: BigInt!
+  lpFee: BigInt!
+  sqrtPriceX96: BigInt!
+  tick: BigInt!
+  logIndex: BigInt
+}
+
+type Tick @entity {
+  id: ID!
+  poolAddress: String
+  tickIdx: BigInt!
+  pool: Pool!
+  liquidityGross: BigInt!
+  liquidityNet: BigInt!
+  price0: BigDecimal!
+  price1: BigDecimal!
+  createdAtTimestamp: BigInt!
+  createdAtBlockNumber: BigInt!
+}
+
+type Token @entity {
+  id: ID!
+  symbol: String!
+  name: String!
+  decimals: BigInt!
+  totalSupply: BigInt!
+  volume: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  txCount: BigInt!
+  poolCount: BigInt!
+  totalValueLocked: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  totalValueLockedUSDUntracked: BigDecimal!
+  derivedNative: BigDecimal!
+  derivedUSD: BigDecimal!
+  whitelistPools: [Pool!]!
+  tokenHourData: [TokenHourData!]!
+  tokenDayData: [TokenDayData!]!
+}
+
+type TokenDayData @entity {
+  id: ID!
+  date: Int!
+  token: Token!
+  txCount: BigInt!
+  volume: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  totalValueLocked: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  priceUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+}
+
+type TokenHourData @entity {
+  id: ID!
+  periodStartUnix: Int!
+  token: Token!
+  txCount: BigInt!
+  volume: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  totalValueLocked: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  priceUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  protocolFeesUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+}
+
+type Transaction @entity {
+  id: ID!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+  modifyLiquiditys: [ModifyLiquidity]!
+  swaps: [Swap]!
+  transfers: [Transfer]!
+  subscriptions: [Subscribe]!
+  unsubscriptions: [Unsubscribe]!
+}
+
+type Transfer @entity {
+  id: ID!
+  tokenId: BigInt!
+  from: String!
+  to: String!
+  transaction: Transaction!
+  logIndex: BigInt!
+  timestamp: BigInt!
+  origin: String!
+  position: Position!
+}
+
+type Unsubscribe @entity {
+  id: ID!
+  tokenId: BigInt!
+  address: String!
+  transaction: Transaction!
+  logIndex: BigInt!
+  timestamp: BigInt!
+  origin: String!
+  position: Position!
+}
