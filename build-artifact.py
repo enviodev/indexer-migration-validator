@@ -300,6 +300,7 @@ tr.tot td.ent{font-weight:600;box-shadow:none;padding-left:11px}
 .case.k-attention{border-top-color:var(--stripe-attention)}
 .case.k-open{border-top-color:var(--stripe-attention)}
 .case.k-none{border-top-color:var(--rule)}
+.case.k-match{border-top-color:var(--stripe-match)}
 .case-num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .case h3{font-size:24px;margin:.3em 0 .1em;font-weight:600;letter-spacing:-.01em}
@@ -441,7 +442,7 @@ REASONS = {
 # token of its own and "none" must not resolve to var(--none), which is
 # undefined and silently leaves the line inheriting body colour.
 KIND_TOKEN = {"ulp": "ulp", "defect": "defect", "attention": "attention",
-              "open": "attention", "none": "muted"}
+              "open": "attention", "none": "muted", "match": "match"}
 
 
 def case(cid, num, kind, title, verdictline, body):
@@ -659,12 +660,15 @@ METHOD = """
 an entity-name prefix so subgraph <code>Gauge</code> resolves to <code>Helper_Gauge</code>, a chain
 filter and id-prefix strip, and a block pin applied to <em>both</em> sides.</p>
 
-<p><strong>The deployment is stopped.</strong> Three polls ten minutes apart returned identical
-<code>latest_processed_block</code> on all five chains, with a caught-up timestamp of
-2026-08-11T23:41:54Z. That is helpful rather than harmful: a frozen snapshot is deterministic. It
-does mean each subgraph must be read back at the frozen block via time-travel, or its newer rows
-read as missing. Time-travel to every pin was verified working; nothing is pruned. The indexer was
-re-checked at the end of every run and had not moved.</p>
+<p><strong>Both sides are live, so each pair is pinned to the lower of the two heads.</strong> The
+earlier campaign ran against a stopped deployment, which was deterministic; this one runs against a
+freshly rebuilt indexer that is caught up and advancing. On some chains it now runs <em>ahead</em> of
+its reference subgraph, and a pin past the subgraph's head makes it reject every query with
+&ldquo;has only indexed up to block N&rdquo; — which a runner will happily record as an entity with
+zero rows, and therefore as a spuriously clean pass. That bug was hit and fixed mid-campaign; pins
+are now <code>min(indexer head, subgraph head)</code>. The indexer is re-checked at the end of every
+run, and entities with no block column cannot be pinned at all, so a small amount of drift on those
+is inherent while both sides move.</p>
 
 <p><strong>Coverage.</strong> Row counts are exhaustive everywhere &mdash; every id on both sides was
 enumerated and set-compared, with no cap. The field-by-field comparison covers every row where an
@@ -704,41 +708,25 @@ meaningful.</p></div>
 # Values recorded in VALIDATION-HANDOFF.md section 6 before this session, so the
 # report can show agreement or disagreement rather than quietly replacing them.
 PRIOR = {
+ "analytics-239":("487,746 / 482,273", "124,229", "differ"),
+ "farm-239":     ("917 / 917", "1", "agree"),
+ "helper-59144": ("916,814 / 916,814", "179", "agree"),
+ "helper-9745":  ("88,642 / 88,642", "142", "agree"),
+ "helper-4663":  ("933 / 935", "0", "differ"),
  "helper-1776":  ("3,642 / 3,642", "0", "agree"),
- "helper-9745":  ("88,642 / 88,642", "98, all amountDecimals ULP", "differ"),
- "helper-4663":  ("933 / 935", "0 — wrong VeToken address", "agree"),
- "v1-59144":     ("458,394 / 458,394", "9 (3 not ULP)", "differ"),
+ "v1-59144":     ("3,003,747 / 3,003,747", "5", "agree"),
  "v1-4663":      ("36 / 36", "0", "agree"),
- "farm-239":     ("917 / 917", "0", "differ"),
- "analytics-239":("27 entities", "8 entities ULP-only", "differ"),
- "helper-59144": ("916,789 / 916,789", "1,627 *Decimals ULP", "differ"),
 }
 
 RECON_NOTES = {
- "helper-59144": "The &sect;6 figure is the <em>standalone</em> indexer baseline, not a merged run. Rows "
-   "reconcile exactly here (916,814 on both sides, 25 more than the standalone baseline, consistent with "
-   "the later pin). The difference count is lower because this run field-compares 10,000 rows per entity "
-   "rather than every row; the class is unchanged &mdash; one dust column, largest absolute difference "
-   "1.0&times;10<sup>-28</sup> tokens.",
- "v1-59144": "Not comparable as totals, and better now. &sect;6's own note says <code>Transaction</code> "
-   "and <code>Swap</code> were <em>not yet compared</em> on Linea; this run includes both &mdash; "
-   "1,274,386 swaps and 1,119,956 transactions &mdash; and finds them exact. All 16 entities reconcile "
-   "row for row. The 5 remaining field differences are all "
-   "<code>untrackedVolumeUSD</code>/<code>dailyVolumeUntracked</code>, which is the open class in "
-   "<a href=\"#case-untracked\">case&nbsp;4</a>, matching &sect;6's &ldquo;3 of them not ULP&rdquo;.",
- "helper-9745": "Same class, different count. Both runs find only "
-   "<code>DepositTokenBalance.amountDecimals</code> dust. The count moves because the earlier run was "
-   "taken at a different head, so the accumulators had different residues; this run compares all 386 "
-   "rows at the frozen pin. The largest absolute difference is 1.4&times;10<sup>-28</sup> tokens.",
- "farm-239": "Not a contradiction. <code>cmp_farm.ts</code> carries this exact row in a "
-   "<code>KNOWN_DIVERGENCES</code> filter and subtracts it before reporting; this report does not "
-   "filter. The row is a subgraph defect &mdash; <a href=\"#case-farm\">case&nbsp;5</a>.",
- "analytics-239": "The prior figure is the <em>standalone</em> result at <code>end_block 4,600,000</code>, "
-   "not a merged run at head &mdash; it matches <code>FINAL-REPORT.md</code>'s "
-   "<code>failed=8</code> exactly, it is the only row in &sect;6 with no row count, and &sect;6's own "
-   "closing note says TAC was &ldquo;not yet compared at head&rdquo;. This run is pinned at 24,087,877, "
-   "five times further, and the 29-hour gap sits at block 21.7M &mdash; outside anything previously "
-   "measured.",
+ "helper-4663": "<strong>Fixed.</strong> Was 933 vs 935 with <em>zero</em> ids in common, because the "
+   "indexer bound a bribe wrapper instead of the VotingEscrow and polled on the wrong anchors. Both "
+   "corrected and redeployed; the two sides now agree row for row and field for field. See "
+   "<a href=\"#case-vetoken\">case&nbsp;2</a>.",
+ "analytics-239": "<strong>Unchanged, and now known to be unfixable.</strong> The missing rows are a hole "
+   "in HyperSync's index, and RPC — which does have the logs — cannot be used as a sync source on this "
+   "chain. Tried, deployed, reverted. See <a href=\"#case-swap\">case&nbsp;6</a>. Row counts move only "
+   "because both sides advanced between runs.",
 }
 
 
@@ -765,15 +753,15 @@ def reconciliation(deps):
     return f"""
 <div class="dep">
   <header class="dep-head"><div class="dep-title">
-    <h3>Against the previously recorded results</h3>
-    <p class="ref">VALIDATION-HANDOFF.md &sect;6 &nbsp;·&nbsp; nothing below was overwritten</p>
+    <h3>Before and after the fix</h3>
+    <p class="ref">deployment 2a5ef57 (before) &rarr; cdf439c (after) &nbsp;·&nbsp; same method, same coverage</p>
   </div></header>
-  <p class="lead">Four of the seven previously recorded results reproduce exactly. Three differ, and
-  each difference is accounted for below rather than silently replaced. None of the three is a
-  regression in the merged indexer.</p>
+  <p class="lead">Every deployment was re-measured against a fresh build after the fixes. One improved
+  outright; one is unchanged and now has a root cause that rules out fixing it from here; the rest
+  reproduce, which is what confirms the changes caused no regression.</p>
   <div class="tw"><table>
-    <thead><tr><th>deployment</th><th class="num">&sect;6 rows</th><th class="num">this run</th>
-    <th class="num">&sect;6 field diffs</th><th class="num">this run</th><th>reconciliation</th></tr></thead>
+    <thead><tr><th>deployment</th><th class="num">before</th><th class="num">after</th>
+    <th class="num">diffs before</th><th class="num">after</th><th>reconciliation</th></tr></thead>
     <tbody>{"".join(rows)}</tbody>
   </table></div>
 </div>"""
@@ -831,7 +819,7 @@ def main():
 
 <header class="mast">
   <div class="wrap">
-    <div class="lbl">pumex-merged-idx &nbsp;·&nbsp; deployment 2a5ef57 &nbsp;·&nbsp; 2026-08-12</div>
+    <div class="lbl">pumex-merged-idx &nbsp;·&nbsp; deployment cdf439c &nbsp;·&nbsp; 2026-08-13</div>
     <h1>Does the merged indexer still say what the subgraphs say?</h1>
     <p class="sub">One endpoint now serves five source indexers across five chains. This reconciles
     every entity it holds against the reference subgraph it replaced, row by row and field by
@@ -849,8 +837,15 @@ def main():
     <div class="banner"><p><strong>The headline.</strong> Seven of the eight validatable
     deployments reconcile against their subgraph — exactly, or to within BigDecimal rounding, or with
     a difference that is the subgraph's fault rather than the indexer's. <strong>One does
-    not:</strong> analytics on chain 239 has a 29-hour indexing gap that removes 2,926 swaps, and
+    not:</strong> analytics on chain 239 is missing 2,926 swaps across a single 29-hour window, and
     every other difference on that deployment follows from it.</p>
+    <p><strong>Two defects were found and fixed since the previous run.</strong> Chain 4663 was
+    binding a bribe wrapper instead of the VotingEscrow, and polling on the wrong anchors — it now
+    matches its subgraph exactly, where before it shared <em>no ids at all</em>.</p>
+    <p><strong>The chain 239 gap was chased to its root and cannot be closed from here.</strong> The
+    hole is in HyperSync's index; RPC has the data but cannot sync this chain, because TAC emits
+    transactions its own node fails to decode. That fix was written, deployed, observed to stall, and
+    reverted. It needs Envio to backfill.</p>
     <p>A ninth, v4, <strong>cannot be validated at all</strong> — both of its reference subgraphs are
     gone. That is neither a pass nor a failure; it is unmeasured.</p></div>
   </div>

@@ -74,10 +74,27 @@ for spec in "${TARGETS[@]}"; do
   # target name instead.
   pinchain="$chain"
   [ "$pinchain" = "-" ] && pinchain="${name##*-}"
-  pin=$(pin_for "$pinchain")
-  if [ -z "$pin" ]; then
+  envio_pin=$(pin_for "$pinchain")
+  if [ -z "$envio_pin" ]; then
     echo "!! no pin for chain $pinchain on this deployment; skipping $name"
     continue
+  fi
+  # Pin at min(envio head, subgraph head). The deployment is live again rather
+  # than frozen, and on some chains it now runs AHEAD of its reference — a pin
+  # past the subgraph's head makes it reject every query with "has only indexed
+  # up to block N", which the runner records as an entity with zero rows and
+  # therefore as a spuriously clean result.
+  sg_pin=$(curl -s -m 30 -X POST "$url" \
+    -H 'content-type: application/json' -H 'User-Agent: parity/1.0' \
+    --data '{"query":"{ _meta { block { number } } }"}' \
+    | python3 -c "import json,sys
+try: print(json.load(sys.stdin)['data']['_meta']['block']['number'])
+except Exception: print('')")
+  if [ -n "$sg_pin" ] && [ "$sg_pin" -lt "$envio_pin" ]; then
+    pin="$sg_pin"
+    echo "   pin capped to subgraph head $sg_pin (envio at $envio_pin)"
+  else
+    pin="$envio_pin"
   fi
 
   if [ ${#selected[@]} -gt 0 ]; then
