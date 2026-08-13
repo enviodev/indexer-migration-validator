@@ -20,6 +20,9 @@ OUT = Path(__file__).parent / "output" / "merged"
 # Display order: smallest/cleanest first, the two Linea giants last.
 ORDER = [
     ("analytics-239", "analytics", 239, "cl-analytics-tac/v1.0.1"),
+    # Added 2026-08-13 with the Analytics_* chain-prefix change. The reference
+    # is EMPTY by design — a pass is 5 singleton rows, everything else 0/0.
+    ("analytics-9745", "analytics", 9745, "analytics-plasma/v1.0.0"),
     ("farm-239", "farm", 239, "farms-tac/v1.0.0"),
     ("helper-59144", "helper", 59144, "lynex-helper/0.0.2"),
     ("helper-9745", "helper", 9745, "ionex-helper/0.3"),

@@ -18,7 +18,7 @@ PINS = {239: 24087877, 1776: 178217185, 4663: 34068305, 9745: 29553607, 59144: 3
 CHAIN_NAMES = {239: "TAC", 1776: "Injective", 4663: "Robinhood", 9745: "Plasma", 59144: "Linea"}
 
 ORDER = [
-    "analytics-239", "farm-239",
+    "analytics-239", "analytics-9745", "farm-239",
     "helper-59144", "helper-9745", "helper-4663", "helper-1776",
     "v1-59144", "v1-9745", "v1-4663", "v1-1776", "v1-239",
     "v4-1776",
@@ -373,6 +373,12 @@ LEADS = {
    'pool price, the missing hourly buckets, the large USD divergences. See '
    '<a href="#case-swap">case&nbsp;6</a>. Chain 239 also carries the standing RPC-quality caveat in '
    '<a href="#case-tac">case&nbsp;7</a>, which is a separate matter.</p>',
+ "analytics-9745": '<p class="lead">The reference deployment is <strong>empty, and correctly so</strong>. '
+   'Factory <code>0x51f563&hellip;d151</code> emitted <code>DefaultCommunityFee(500)</code> and has never '
+   'created a pool: 0 pools, 0 tokens, 0 swaps, 0 positions on both sides. A pass here is five singleton '
+   'rows &mdash; Factory, Bundle and the three fee caches &mdash; and 0/0 on everything else. It is '
+   'covered so that any future pool is picked up automatically, and covering it is what forced every '
+   '<code>Analytics_*</code> id to carry a chain prefix.</p>',
  "farm-239": '<p class="lead">Row-for-row exact. The single field difference is a defect in the '
    '<em>subgraph</em>, not in the migration — proven against the chain in '
    '<a href="#case-farm">case&nbsp;5</a>.</p>',
@@ -729,6 +735,7 @@ meaningful.</p></div>
 # report can show agreement or disagreement rather than quietly replacing them.
 PRIOR = {
  "analytics-239":("487,746 / 482,273", "124,229", "differ"),
+ "analytics-9745":("not validated", "&mdash;", "new"),
  "farm-239":     ("917 / 917", "1", "agree"),
  "helper-59144": ("916,814 / 916,814", "179", "agree"),
  "helper-9745":  ("88,642 / 88,642", "142", "agree"),
@@ -743,6 +750,10 @@ PRIOR = {
 }
 
 RECON_NOTES = {
+ "analytics-9745": "<strong>New, and it overturns a previous decision.</strong> Analytics on Plasma was "
+   "recorded as out of scope because the reference is empty. It is now built: the reference really is "
+   "empty (5 singleton rows, 0 pools), but covering it chain-prefixed every <code>Analytics_*</code> id "
+   "and brought the last uncovered subgraph deployment into the campaign.",
  "v1-239":  "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",
  "v1-9745": "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",
  "v1-1776": "<strong>New.</strong> Reference supplied after the earlier campaign; previously \u201cno URL on file\u201d.",

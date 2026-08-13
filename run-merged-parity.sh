@@ -37,7 +37,9 @@ OUTDIR='./output/merged'
 TARGETS=(
 "helper-1776|$ORMI/pumex-helper/v0.0.2/gn|./pumex-helper/subgraph-schema.1776.graphql|./pumex-helper/overrides.json|Helper_|1776|178217185"
 "farm-239|$GOLDSKY/farms-tac/v1.0.0/gn|./pumex-farming/subgraph-schema.introspected.graphql|./pumex-farming/overrides.json|Farm_|-|24087877"
-"analytics-239|$GOLDSKY/cl-analytics-tac/v1.0.1/gn|./pumex-cl-analytics/subgraph-schema.introspected.graphql|./pumex-cl-analytics/overrides.json|Analytics_|-|24087877"
+# Analytics ids became `${chainId}-` prefixed when Plasma was added, so this
+# target now runs WITH --chain. It used to be `-`. Farm_ is still bare.
+"analytics-239|$GOLDSKY/cl-analytics-tac/v1.0.1/gn|./pumex-cl-analytics/subgraph-schema.introspected.graphql|./pumex-cl-analytics/overrides.json|Analytics_|239|24087877"
 "v1-4663|$GOLDSKY/v1-orvex/1.0.0/gn|./pumex-v1/subgraph-schema.4663.graphql|./pumex-v1/overrides.json|V1_|4663|34068305"
 "helper-4663|$GOLDSKY/orvex-helper/1.0.1/gn|./pumex-helper/subgraph-schema.4663.graphql|./pumex-helper/overrides.json|Helper_|4663|34068305"
 "helper-9745|$GOLDSKY/ionex-helper/0.3/gn|./pumex-helper/subgraph-schema.9745.graphql|./pumex-helper/overrides.json|Helper_|9745|29553607"
@@ -50,6 +52,14 @@ TARGETS=(
 "v1-9745|$GOLDSKY/v1-ionex/0.2/gn|./pumex-v1/subgraph-schema.9745.graphql|./pumex-v1/overrides.json|V1_|9745|0"
 "v1-1776|$ORMI/pumex-v1/v0.0.1/gn|./pumex-v1/subgraph-schema.1776.graphql|./pumex-v1/overrides.json|V1_|1776|0"
 "v4-1776|$ORMI/pumex-v4cl-main/v1.0.1/gn|./pumex-v4/subgraph-schema.1776.graphql|./pumex-v4/overrides.json|V4_|1776|0"
+# Added 2026-08-13 with the analytics chain-prefix change. This reference is
+# EMPTY and expected to stay that way: factory 0x51f563…d151 has emitted
+# DefaultCommunityFee(500) and nothing else, poolCount 0. A pass is
+# Analytics_Factory / Bundle / BurnFeeCache / SwapFeeCache /
+# PositionTransferCache at 1/1 each, every other entity 0/0, 0 field diffs.
+# Its schema introspects byte-identical to cl-analytics-tac's, so the same
+# introspected file is reused deliberately.
+"analytics-9745|$GOLDSKY/analytics-plasma/v1.0.0/gn|./pumex-cl-analytics/subgraph-schema.introspected.graphql|./pumex-cl-analytics/overrides.json|Analytics_|9745|0"
 )
 
 mkdir -p "$OUTDIR"
@@ -110,9 +120,10 @@ except Exception: print('')")
     [ $match -eq 1 ] || continue
   fi
 
-  # Analytics_* and Farm_* are chain-239-only and carry BARE ids, so they run
-  # with no --chain at all. Passing one would filter on a "239-" prefix that
-  # those tables never had, and every row would read as missing.
+  # `chain=-` means the target's ids are BARE — no --chain, because passing one
+  # would filter on a "239-" prefix those tables never had and every row would
+  # read as missing. Only Farm_ is in that state now; Analytics_ was prefixed
+  # when Plasma was added.
   chainflag=()
   [ "$chain" != "-" ] && chainflag=(--chain "$chain")
 
