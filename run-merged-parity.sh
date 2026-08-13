@@ -107,11 +107,29 @@ for spec in "${TARGETS[@]}"; do
     | python3 -c "import json,sys
 try: print(json.load(sys.stdin)['data']['_meta']['block']['number'])
 except Exception: print('')")
+  #
+  # Capping to the subgraph's _meta head is NOT sufficient on its own. That head
+  # is what the subgraph has INGESTED; its time-travel queries can still refuse a
+  # block a little below it, and both sides keep advancing between the moment the
+  # pin is read and the moment the last entity is queried. On 2026-08-13
+  # helper-1776 was pinned at 178,452,971 against an Ormi subgraph that answered
+  # "has only indexed up to block number 178,452,955" for EVERY entity — 19 of 19
+  # errored, each was recorded as zero rows, and the run wrote a report with
+  # totalEntities 0 and exited 0. A completely clean-looking pass that compared
+  # nothing. Hence: take the true minimum, then back off a margin.
+  #
+  # The margin costs only the newest few blocks, and both sides are pinned to the
+  # same number, so it cannot mask a real difference — it only avoids the race.
+  PIN_MARGIN="${PIN_MARGIN:-200}"
   if [ -n "$sg_pin" ] && [ "$sg_pin" -lt "$envio_pin" ]; then
     pin="$sg_pin"
     echo "   pin capped to subgraph head $sg_pin (envio at $envio_pin)"
   else
     pin="$envio_pin"
+  fi
+  if [ "$pin" -gt "$PIN_MARGIN" ]; then
+    pin=$((pin - PIN_MARGIN))
+    echo "   pin backed off ${PIN_MARGIN} blocks to $pin (both sides still advancing)"
   fi
 
   if [ ${#selected[@]} -gt 0 ]; then
@@ -144,5 +162,26 @@ except Exception: print('')")
     --output "$OUTDIR/$name.json" \
     2>&1 | grep -vE 'DeprecationWarning|trace-deprecation'
 
-  echo "exit=${PIPESTATUS[0]} for $name"
+  rc=${PIPESTATUS[0]}
+  echo "exit=$rc for $name"
+
+  # A report with zero entities is NEVER a pass — it means every entity query
+  # failed (see the pin note above) and the runner dutifully recorded each as
+  # "0 rows, no differences". Left unchecked that flows all the way into the
+  # published artifact as a clean row. Fail loudly instead.
+  python3 - "$OUTDIR/$name.json" "$name" <<'PY'
+import json, sys
+path, name = sys.argv[1], sys.argv[2]
+try:
+    s = json.load(open(path))["summary"]
+except Exception as e:
+    print(f"!! {name}: report unreadable ({e}) — TREAT AS FAILED"); sys.exit(0)
+if s.get("totalEntities", 0) == 0:
+    print(f"!! {name}: EMPTY REPORT — 0 entities compared. This is NOT a pass.")
+    print(f"!! Almost always a pin past the subgraph's servable head; retry with")
+    print(f"!! a bigger PIN_MARGIN (currently {__import__('os').environ.get('PIN_MARGIN','200')}).")
+elif s.get("totalSubgraphRecords", 0) == 0 and s.get("totalHyperindexRecords", 0) == 0:
+    print(f"!! {name}: 0 rows on BOTH sides across {s['totalEntities']} entities —")
+    print(f"!! vacuous. Genuine only if the reference really is empty.")
+PY
 done
