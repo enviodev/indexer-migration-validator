@@ -34,10 +34,22 @@ def fmt(n):
 
 
 def verdict(dep):
-    """Classify a deployment for the summary strip."""
+    """Classify a deployment for the summary strip.
+
+    Rows MISSING from envio and rows EXTRA in envio are not the same finding and
+    must not share a label. Missing means the indexer failed to record something
+    the subgraph has. Extra means the opposite — and on a live indexer measured
+    against a pinned subgraph it is usually not a finding at all, because
+    entities with no block column cannot be pinned and keep advancing during the
+    run (see the caveat in the headline). Collapsing both into "row-set differs"
+    put a 2-rows-in-3,003,867 pinning artifact under the same red chip as chain
+    239's 5,474 genuinely absent rows.
+    """
     t = dep["totals"]
-    if t["missingInEnvio"] or t["extraInEnvio"]:
-        return "defect", "row-set differs"
+    if t["missingInEnvio"]:
+        return "defect", "rows missing from envio"
+    if t["extraInEnvio"]:
+        return "ahead", "envio holds rows the subgraph does not"
     if t["diffOverTenth"]:
         return "attention", "differences above 0.1%"
     if t["diffAny"]:
@@ -49,14 +61,17 @@ VERDICT_LABEL = {
     "match": "Exact",
     "ulp": "Rounding only",
     "attention": "Differences > 0.1%",
-    "defect": "Row-set differs",
+    "ahead": "Envio ahead",
+    "defect": "Rows missing",
 }
 
 
 def entity_row(r):
     cls = []
-    if r["missingInEnvio"] or r["extraInEnvio"]:
+    if r["missingInEnvio"]:
         cls.append("r-defect")
+    elif r["extraInEnvio"]:
+        cls.append("r-attention")
     elif r["diffOverTenth"]:
         cls.append("r-attention")
     elif r["diffAny"]:
@@ -269,6 +284,7 @@ section.band > .wrap > h2{font-size:13px;letter-spacing:.16em;text-transform:upp
   border-radius:2px;white-space:nowrap;border:1px solid currentColor}
 .c-match{color:var(--match)} .c-ulp{color:var(--ulp)}
 .c-attention{color:var(--attention)} .c-defect{color:var(--defect)}
+.c-ahead{color:var(--attention)}
 
 .dep p.note,.dep p.lead{font-size:15.5px;color:var(--muted);max-width:78ch;margin:15px 0 0}
 .dep p.lead{color:var(--ink)}
@@ -794,7 +810,7 @@ def reconciliation(deps):
 <div class="dep">
   <header class="dep-head"><div class="dep-title">
     <h3>Before and after the fix</h3>
-    <p class="ref">deployment 2a5ef57 (before) &rarr; cdf439c (after) &nbsp;·&nbsp; same method, same coverage</p>
+    <p class="ref">deployment cdf439c (before) &rarr; 4a60150 (after) &nbsp;·&nbsp; same method, same coverage</p>
   </div></header>
   <p class="lead">Every deployment was re-measured against a fresh build after the fixes. One improved
   outright; one is unchanged and now has a root cause that rules out fixing it from here; the rest
@@ -859,7 +875,7 @@ def main():
 
 <header class="mast">
   <div class="wrap">
-    <div class="lbl">pumex-merged-idx &nbsp;·&nbsp; deployment cdf439c &nbsp;·&nbsp; 2026-08-13</div>
+    <div class="lbl">pumex-merged-idx &nbsp;·&nbsp; deployment 4a60150 &nbsp;·&nbsp; 2026-08-14</div>
     <h1>Does the merged indexer still say what the subgraphs say?</h1>
     <p class="sub">One endpoint now serves five source indexers across five chains. This reconciles
     every entity it holds against the reference subgraph it replaced, row by row and field by
@@ -874,20 +890,43 @@ def main():
       <div class="fact"><dt>fields differing</dt><dd>{fmt(gtot['any'])}</dd></div>
     </dl>
     {warn}
-    <div class="banner"><p><strong>The headline.</strong> Seven of the eight validatable
-    deployments reconcile against their subgraph — exactly, or to within BigDecimal rounding, or with
-    a difference that is the subgraph's fault rather than the indexer's. <strong>One does
-    not:</strong> analytics on chain 239 is missing 2,926 swaps across a single 29-hour window, and
-    every other difference on that deployment follows from it.</p>
-    <p><strong>Two defects were found and fixed since the previous run.</strong> Chain 4663 was
-    binding a bribe wrapper instead of the VotingEscrow, and polling on the wrong anchors — it now
-    matches its subgraph exactly, where before it shared <em>no ids at all</em>.</p>
-    <p><strong>The chain 239 gap was chased to its root and cannot be closed from here.</strong> The
-    hole is in HyperSync's index; RPC has the data but cannot sync this chain, because TAC emits
+    <div class="banner"><p><strong>The headline.</strong> Thirteen deployments compared — every
+    reference that exists on a chain this indexer currently runs. <code>analytics-plasma</code> on
+    chain 9745 is the newcomer: previously ruled out of scope, now indexed, and it reconciles
+    <strong>exactly</strong>. Still outside the measurement, and neither pass nor failure:
+    <code>v4-orvex</code> (chain 4663), whose subgraph is gone, and the two Zircuit references
+    (<code>ocelex-helper</code>, <code>ocelex-v1</code>), whose chain is deliberately dormant because
+    it has no usable log source.</p>
+    <p><strong>Covering Plasma was a breaking change, and it was re-validated rather than
+    assumed.</strong> Analytics ids were bare because analytics ran on one chain; a second chain
+    would have written to the <em>same rows</em> — <code>Bundle</code> and the three fee caches are
+    all keyed on the literal <code>"1"</code>, and <code>Position</code> on a bare NFT tokenId. Every
+    <code>Analytics_*</code> id therefore gained a <code>$&#123;chainId&#125;-</code> prefix. Chain 239 was
+    re-run through the prefix-stripping path and reproduces its previous result to the row: the same
+    5,473-row deficit, the same one extra <code>Burn</code>, the same per-entity gaps.</p>
+    <p><strong>The chain 239 gap is unchanged and still cannot be closed from here.</strong> The hole
+    is in HyperSync's index; RPC has the data but cannot sync this chain, because TAC emits
     transactions its own node fails to decode. That fix was written, deployed, observed to stall, and
     reverted. It needs Envio to backfill.</p>
-    <p>A ninth, v4, <strong>cannot be validated at all</strong> — both of its reference subgraphs are
-    gone. That is neither a pass nor a failure; it is unmeasured.</p></div>
+    <p><strong>One new defect, and it is not in the mappings.</strong> Nine of 917 NFT position ids
+    are double-counted on chain 239 — an extra <code>DecreaseLiquidity</code> applied during backfill.
+    It shows up identically in <code>Analytics_Position</code> and <code>Farm_Deposit</code>, which
+    are written by two independent handlers on the same shared contract, so it is duplicate event
+    delivery rather than mapping logic. It pre-existed at one occurrence and came out at nine on this
+    resync, so it is non-deterministic.</p>
+    <p><strong>Read chains 1776 and 9745 with one caveat.</strong> The previous run measured a
+    <em>stopped</em> deployment; this one measures a live indexer following head, and the pin only
+    binds entities that carry a block column. The event tables (<code>Swap</code>, <code>Mint</code>,
+    <code>Burn</code>) expose only a timestamp, and every day/hour accumulator
+    (<code>DayData</code>, <code>PairHourData</code>, <code>PairDayData</code>,
+    <code>TokenDayData</code>, <code>ProtocolDayData</code> …) has neither — so the indexer keeps
+    writing and accumulating past the pin while the subgraph stays frozen at it. That accounts for
+    the extra rows and for essentially all of the field differences newly showing on
+    <code>v1-1776</code> and <code>v4-1776</code>. It was verified rather than assumed: the affected
+    entity list is exactly the unpinnable set, and the one pinnable near-exception
+    (<code>V1_Pair</code>, via <code>createdAtBlockNumber</code>, which pins existence but not later
+    mutation) shows 5 rows against thousands. The direction is the tell — envio is ahead on these,
+    never short.</p></div>
   </div>
 </header>
 
